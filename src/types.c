@@ -1,194 +1,18 @@
 /**
- * @file data_utils.c
+ * @file types.c
  * @author SpockBotMC
  * @author andersonarc (e.andersonarc@gmail.com)
  * @brief data structures and encoders/decoders for minecraft data types
- * @version 0.2
+ * @version 0.3
  * @date 2020-12-14
  */
+      /* includes */
 #include "mcp/types.h" /* this */
 
-void enc_byte(FILE* dest, const uint8_t src) {
-  fputc(src, dest);
-}
-uint8_t dec_byte(FILE* src) {
-  return (uint8_t) fgetc(src);
-}
-
-void enc_be16(FILE* dest, uint16_t src) {
-  src = htobe16(src);
-  fwrite(&src, sizeof(uint16_t), 1, dest);
-}
-uint16_t dec_be16(FILE* src) {
-  uint16_t dest;
-  fread(&dest, sizeof(uint16_t), 1, src);
-  return be16toh(dest);
-}
-void enc_le16(FILE* dest, uint16_t src) {
-  src = htole16(src);
-  fwrite(&src, sizeof(uint16_t), 1, dest);
-}
-uint16_t dec_le16(FILE* src) {
-  uint16_t dest;
-  fread(&dest, sizeof(uint16_t), 1, src);
-  return le16toh(dest);
-}
-
-void enc_be32(FILE* dest, uint32_t src) {
-  src = htobe32(src);
-  fwrite(&src, sizeof(uint32_t), 1, dest);
-}
-uint32_t dec_be32(FILE* src) {
-  uint32_t dest;
-  fread(&dest, sizeof(uint32_t), 1, src);
-  return be32toh(dest);
-}
-void enc_le32(FILE* dest, uint32_t src) {
-  src = htole32(src);
-  fwrite(&src, sizeof(uint32_t), 1, dest);
-}
-uint32_t dec_le32(FILE* src) {
-  uint32_t dest;
-  fread(&dest, sizeof(uint32_t), 1, src);
-  return le32toh(dest);
-}
-
-void enc_be64(FILE* dest, uint64_t src) {
-  src = htobe64(src);
-  fwrite(&src, sizeof(uint64_t), 1, dest);
-}
-uint64_t dec_be64(FILE* src) {
-  uint64_t dest;
-  fread(&dest, sizeof(uint64_t), 1, src);
-  return be64toh(dest);
-}
-void enc_le64(FILE* dest, uint64_t src) {
-  src = htole64(src);
-  fwrite(&src, sizeof(uint64_t), 1, dest);
-}
-uint64_t dec_le64(FILE* src) {
-  uint64_t dest;
-  fread(&dest, sizeof(uint64_t), 1, src);
-  return le64toh(dest);
-}
-
-void enc_bef32(FILE* dest, float src) {
-  uint32_t tmp = htobe32((uint32_t) src);
-  fwrite(&tmp, sizeof(uint32_t), 1, dest);
-}
-float dec_bef32(FILE* src) {
-  uint32_t dest;
-  fread(&dest, sizeof(uint32_t), 1, src);
-  return (float) be32toh(dest);
-}
-void enc_lef32(FILE* dest, float src) {
-  uint32_t tmp = htole32((uint32_t) src);
-  fwrite(&tmp, sizeof(uint32_t), 1, dest);
-}
-float dec_lef32(FILE* src) {
-  uint32_t dest;
-  fread(&dest, sizeof(uint32_t), 1, src);
-  return (float) le32toh(dest);
-}
-
-void enc_bef64(FILE* dest, double src) {
-  uint64_t tmp = htobe64((uint64_t) src);
-  fwrite(&tmp, sizeof(uint64_t), 1, dest);
-}
-double dec_bef64(FILE* src) {
-  uint64_t dest;
-  fread(&dest, sizeof(uint64_t), 1, src);
-  return (double) be32toh(dest);
-}
-void enc_lef64(FILE* dest, double src) {
-  uint64_t tmp = htole64((uint64_t) src);
-  fwrite(&tmp, sizeof(uint64_t), 1, dest);
-}
-double dec_lef64(FILE* src) {
-  uint64_t dest;
-  fread(&dest, sizeof(uint64_t), 1, src);
-  return (double) le64toh(dest);
-}
-
-int verify_varnum(const char *buf, size_t max_len, int type_max) {
-  if(!max_len)
-    return VARNUM_OVERRUN;
-  int len =  1;
-  for(; *(const unsigned char*) buf & 0x80; buf++, len++) {
-    if(len == type_max)
-      return VARNUM_INVALID;
-    if((size_t) len == max_len)
-      return VARNUM_OVERRUN;
-  }
-  return len;
-}
-
-int verify_varint(const char *buf, size_t max_len) {
-  return verify_varnum(buf, max_len, 5);
-}
-int verify_varlong(const char *buf, size_t max_len) {
-  return verify_varnum(buf, max_len, 10);
-}
-
-size_t size_varint(uint32_t varint) {
-  if(varint < (1 << 7))
-    return 1;
-  if(varint < (1 << 14))
-    return 2;
-  if(varint < (1 << 21))
-    return 3;
-  if(varint < (1 << 28))
-    return 4;
-  return 5;
-}
-size_t size_varlong(uint64_t varlong) {
-  if(varlong < (1 << 7))
-    return 1;
-  if(varlong < (1 << 14))
-    return 2;
-  if(varlong < (1 << 21))
-    return 3;
-  if(varlong < (1 << 28))
-    return 4;
-  if(varlong < (1ULL << 35))
-    return 5;
-  if(varlong < (1ULL << 42))
-    return 6;
-  if(varlong < (1ULL << 49))
-    return 7;
-  if(varlong < (1ULL << 56))
-    return 8;
-  if(varlong < (1ULL << 63))
-    return 9;
-  return 10;
-}
-
-void enc_varint(FILE* dest, uint64_t src) {
-  for(; src >= 0x80; src >>= 7)
-    fputc(0x80 | (src & 0x7F), dest);
-  fputc(src & 0x7F, dest);
-}
-int64_t dec_varint(FILE* src) {
-  uint64_t dest = 0;
-  int i = 0;
-  uint64_t j = (uint64_t) fgetc(src);
-  for(; j & 0x80; i+=7, j = (uint64_t) fgetc(src))
-    dest |= (j & 0x7F) << i;
-  dest |= j << i;
-  return (int64_t) dest;
-}
-
-void enc_string(FILE* dest, const char* src) {
-  enc_varint(dest, strlen(src));
-  fputs(src, dest);
-}
-MALLOC char* dec_string(FILE* src) {
-  size_t length = (size_t) dec_varint(src);
-  char* string = malloc(length);
-  fread(string, sizeof(char), length, src);
-  return string;
-}
-
+      /* minecraft data encoders and decoders */
+/**
+ * @brief minecraft UUID
+ */
 void enc_uuid(FILE* dest, mc_uuid src) {
   enc_be64(dest, src.msb);
   enc_be64(dest, src.lsb);
@@ -200,6 +24,9 @@ mc_uuid dec_uuid(FILE* src) {
   return dest;
 }
 
+/**
+ * @brief minecraft position
+ */
 void enc_position(FILE* dest, mc_position src) {
   uint64_t tmp = (
     ((uint64_t) src.x & 0x3FFFFFFUL) << 38 |
@@ -220,18 +47,9 @@ mc_position dec_position(FILE* src) {
   return dest;
 }
 
-void enc_buffer(FILE* dest, const char_vector_t src) {
-  fwrite(src.data, sizeof(char), src.size, dest);
-}
-
-MALLOC char_vector_t dec_buffer(FILE* src, size_t len) {
-  char_vector_t dest;
-  dest.size = len;
-  dest.data = malloc(sizeof(char) * len);
-  fread(&dest.data, sizeof(char), len, src);
-  return dest;
-}
-
+/**
+ * @brief minecraft container slot
+ */
 void mc_slot_encode(FILE* dest, mc_slot* this) {
   enc_byte(dest, this->present);
   if (this->present) {
@@ -244,7 +62,6 @@ void mc_slot_encode(FILE* dest, mc_slot* this) {
     }
   }
 }
-
 void mc_slot_decode(FILE* src, mc_slot* this) {
   this->present = dec_byte(src);
   if (this->present) {
@@ -257,6 +74,9 @@ void mc_slot_decode(FILE* src, mc_slot* this) {
   }
 }
 
+/**
+ * @brief minecraft particle
+ */
 void mc_particle_encode(FILE* dest, mc_particle* this) {
   switch(this->type) {
     case PARTICLE_BLOCK:
@@ -276,7 +96,6 @@ void mc_particle_encode(FILE* dest, mc_particle* this) {
       break;
   }
 }
-
 void mc_particle_decode(FILE* src, mc_particle* this, mc_particle_type p_type) {
   this->type = p_type;
   switch (this->type) {
@@ -298,6 +117,9 @@ void mc_particle_decode(FILE* src, mc_particle* this, mc_particle_type p_type) {
   }
 }
 
+/**
+ * @brief minecraft item smelting
+ */
 void mc_smelting_encode(FILE* dest, mc_smelting* this) {
   enc_string(dest, this->group);
   enc_varint(dest, this->ingredient.size);
@@ -308,7 +130,6 @@ void mc_smelting_encode(FILE* dest, mc_smelting* this) {
   enc_bef32(dest, this->experience);
   enc_varint(dest, (uint64_t) this->cook_time);
 }
-
 MALLOC void mc_smelting_decode(FILE* src, mc_smelting* this) {
   this->group = dec_string(src);
   this->ingredient.size = (size_t) dec_varint(src);
@@ -321,6 +142,9 @@ MALLOC void mc_smelting_decode(FILE* src, mc_smelting* this) {
   this->cook_time = (int32_t) dec_varint(src);
 }
 
+/**
+ * @brief minecraft tag
+ */
 void mc_tag_encode(FILE* dest, mc_tag* this) {
   enc_string(dest, this->tag_name);
   enc_varint(dest, this->entries.size);
@@ -328,7 +152,6 @@ void mc_tag_encode(FILE* dest, mc_tag* this) {
     enc_varint(dest, (uint64_t) this->entries.data[i]);
   }
 }
-
 void mc_tag_decode(FILE* src, mc_tag* this) {
   this->tag_name = dec_string(src);
   this->entries.size = (size_t) dec_varint(src);
@@ -338,6 +161,9 @@ void mc_tag_decode(FILE* src, mc_tag* this) {
   }
 }
 
+/**
+ * @brief minecraft entity equipment
+ */
 void mc_entity_equipment_encode(FILE* dest, mc_entity_equipment* this) {
   for (size_t i = 0; i < (this->equipments.size - 1); i++) {
     enc_byte(dest, (uint8_t) (0x80 | this->equipments.data[i].slot));
@@ -347,7 +173,6 @@ void mc_entity_equipment_encode(FILE* dest, mc_entity_equipment* this) {
   enc_byte(dest, (uint8_t) last.slot);
   mc_slot_encode(dest, &last.item);
 }
-
 void mc_entity_equipment_decode(FILE* src, mc_entity_equipment* this) {
   //todo VLA
 
@@ -361,6 +186,9 @@ void mc_entity_equipment_decode(FILE* src, mc_entity_equipment* this) {
   } while(slot & 0x80);*/
 }
 
+/**
+ * @brief minecraft entity metadata
+ */
 void mc_entity_metadata_encode(FILE* dest, mc_entity_metadata* this) {
   //todo nbt
 
@@ -437,7 +265,6 @@ void mc_entity_metadata_encode(FILE* dest, mc_entity_metadata* this) {
   }
   enc_byte(dest, 0xFF);*/
 }
-
 void mc_entity_metadata_decode(FILE* src, mc_entity_metadata* this) {
   /*data.clear();
   uint8_t index = dec_byte(src);
@@ -521,4 +348,249 @@ void mc_entity_metadata_decode(FILE* src, mc_entity_metadata* this) {
     }
     index = dec_byte(src);
   }*/
+}
+
+      /* primitive type encoders and decoders */
+/**
+ * @brief uint8
+ */
+void enc_byte(FILE* dest, const uint8_t src) {
+  fputc(src, dest);
+}
+uint8_t dec_byte(FILE* src) {
+  return (uint8_t) fgetc(src);
+}
+
+/**
+ * @brief big endian uint16
+ */
+void enc_be16(FILE* dest, uint16_t src) {
+  src = htobe16(src);
+  fwrite(&src, sizeof(uint16_t), 1, dest);
+}
+uint16_t dec_be16(FILE* src) {
+  uint16_t dest;
+  fread(&dest, sizeof(uint16_t), 1, src);
+  return be16toh(dest);
+}
+
+/**
+ * @brief little endian uint16
+ */
+void enc_le16(FILE* dest, uint16_t src) {
+  src = htole16(src);
+  fwrite(&src, sizeof(uint16_t), 1, dest);
+}
+uint16_t dec_le16(FILE* src) {
+  uint16_t dest;
+  fread(&dest, sizeof(uint16_t), 1, src);
+  return le16toh(dest);
+}
+
+/**
+ * @brief big endian uint32
+ */
+void enc_be32(FILE* dest, uint32_t src) {
+  src = htobe32(src);
+  fwrite(&src, sizeof(uint32_t), 1, dest);
+}
+uint32_t dec_be32(FILE* src) {
+  uint32_t dest;
+  fread(&dest, sizeof(uint32_t), 1, src);
+  return be32toh(dest);
+}
+
+/**
+ * @brief little endian uint16
+ */
+void enc_le32(FILE* dest, uint32_t src) {
+  src = htole32(src);
+  fwrite(&src, sizeof(uint32_t), 1, dest);
+}
+uint32_t dec_le32(FILE* src) {
+  uint32_t dest;
+  fread(&dest, sizeof(uint32_t), 1, src);
+  return le32toh(dest);
+}
+
+/**
+ * @brief big endian uint64
+ */
+void enc_be64(FILE* dest, uint64_t src) {
+  src = htobe64(src);
+  fwrite(&src, sizeof(uint64_t), 1, dest);
+}
+uint64_t dec_be64(FILE* src) {
+  uint64_t dest;
+  fread(&dest, sizeof(uint64_t), 1, src);
+  return be64toh(dest);
+}
+
+/**
+ * @brief little endian uint64
+ */
+void enc_le64(FILE* dest, uint64_t src) {
+  src = htole64(src);
+  fwrite(&src, sizeof(uint64_t), 1, dest);
+}
+uint64_t dec_le64(FILE* src) {
+  uint64_t dest;
+  fread(&dest, sizeof(uint64_t), 1, src);
+  return le64toh(dest);
+}
+
+/**
+ * @brief big endian float32
+ */
+void enc_bef32(FILE* dest, float src) {
+  uint32_t tmp = htobe32((uint32_t) src);
+  fwrite(&tmp, sizeof(uint32_t), 1, dest);
+}
+float dec_bef32(FILE* src) {
+  uint32_t dest;
+  fread(&dest, sizeof(uint32_t), 1, src);
+  return (float) be32toh(dest);
+}
+
+/**
+ * @brief little endian float32
+ */
+void enc_lef32(FILE* dest, float src) {
+  uint32_t tmp = htole32((uint32_t) src);
+  fwrite(&tmp, sizeof(uint32_t), 1, dest);
+}
+float dec_lef32(FILE* src) {
+  uint32_t dest;
+  fread(&dest, sizeof(uint32_t), 1, src);
+  return (float) le32toh(dest);
+}
+
+/**
+ * @brief big endian float64
+ */
+void enc_bef64(FILE* dest, double src) {
+  uint64_t tmp = htobe64((uint64_t) src);
+  fwrite(&tmp, sizeof(uint64_t), 1, dest);
+}
+double dec_bef64(FILE* src) {
+  uint64_t dest;
+  fread(&dest, sizeof(uint64_t), 1, src);
+  return (double) be32toh(dest);
+}
+
+/**
+ * @brief little endian float64
+ */
+void enc_lef64(FILE* dest, double src) {
+  uint64_t tmp = htole64((uint64_t) src);
+  fwrite(&tmp, sizeof(uint64_t), 1, dest);
+}
+double dec_lef64(FILE* src) {
+  uint64_t dest;
+  fread(&dest, sizeof(uint64_t), 1, src);
+  return (double) le64toh(dest);
+}
+
+/**
+ * @brief varnum parsing utilities
+ */
+int verify_varnum(const char *buf, size_t max_len, int type_max) {
+  if(!max_len)
+    return VARNUM_OVERRUN;
+  int len =  1;
+  for(; *(const unsigned char*) buf & 0x80; buf++, len++) {
+    if(len == type_max)
+      return VARNUM_INVALID;
+    if((size_t) len == max_len)
+      return VARNUM_OVERRUN;
+  }
+  return len;
+}
+int verify_varint(const char *buf, size_t max_len) {
+  return verify_varnum(buf, max_len, 5);
+}
+int verify_varlong(const char *buf, size_t max_len) {
+  return verify_varnum(buf, max_len, 10);
+}
+
+/**
+ * @brief get varnum size
+ */
+size_t size_varint(uint32_t varint) {
+  if(varint < (1 << 7))
+    return 1;
+  if(varint < (1 << 14))
+    return 2;
+  if(varint < (1 << 21))
+    return 3;
+  if(varint < (1 << 28))
+    return 4;
+  return 5;
+}
+size_t size_varlong(uint64_t varlong) {
+  if(varlong < (1 << 7))
+    return 1;
+  if(varlong < (1 << 14))
+    return 2;
+  if(varlong < (1 << 21))
+    return 3;
+  if(varlong < (1 << 28))
+    return 4;
+  if(varlong < (1ULL << 35))
+    return 5;
+  if(varlong < (1ULL << 42))
+    return 6;
+  if(varlong < (1ULL << 49))
+    return 7;
+  if(varlong < (1ULL << 56))
+    return 8;
+  if(varlong < (1ULL << 63))
+    return 9;
+  return 10;
+}
+
+/**
+ * @brief variable size integer
+ */
+void enc_varint(FILE* dest, uint64_t src) {
+  for(; src >= 0x80; src >>= 7)
+    fputc(0x80 | (src & 0x7F), dest);
+  fputc(src & 0x7F, dest);
+}
+int64_t dec_varint(FILE* src) {
+  uint64_t dest = 0;
+  int i = 0;
+  uint64_t j = (uint64_t) fgetc(src);
+  for(; j & 0x80; i+=7, j = (uint64_t) fgetc(src))
+    dest |= (j & 0x7F) << i;
+  dest |= j << i;
+  return (int64_t) dest;
+}
+
+/**
+ * @brief string
+ */
+void enc_string(FILE* dest, const char* src) {
+  enc_varint(dest, strlen(src));
+  fputs(src, dest);
+}
+MALLOC char* dec_string(FILE* src) {
+  size_t length = (size_t) dec_varint(src);
+  char* string = malloc(length);
+  fread(string, sizeof(char), length, src);
+  return string;
+}
+
+/**
+ * @brief buffer
+ */
+void enc_buffer(FILE* dest, const char_vector_t src) {
+  fwrite(src.data, sizeof(char), src.size, dest);
+}
+MALLOC char_vector_t dec_buffer(FILE* src, size_t len) {
+  char_vector_t dest;
+  dest.size = len;
+  dest.data = malloc(sizeof(char) * len);
+  fread(&dest.data, sizeof(char), len, src);
+  return dest;
 }

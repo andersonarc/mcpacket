@@ -1156,21 +1156,21 @@ def run(version):
     impl_upper = [
         *warning_impl,
         f"/* MCD version {version.replace('_', '.')} */",
-        f"#include \"protocol.h\"",
+        f"#include \"mcp/protocol.h\"",
         ""
     ]
     impl_lower = []
     particle_header = [
         *warning_particle,
         f"/* MCD version {version.replace('_', '.')} */",
-        "#ifndef PARTICLE_TYPES_H",
-        "#define PARTICLE_TYPES_H",
+        "#ifndef MCP_PARTICLES_H",
+        "#define MCP_PARTICLES_H",
         "",
         "typedef enum mc_particle_type {"
     ]
     particle_header.extend(f"{indent}PARTICLE_{x.upper()}," for x in mcd.particles_name)
     particle_header[-1] = particle_header[-1][:-1]
-    particle_header += ["} mc_particle_type;", "#endif /* PARTICLE_TYPES_H */", ""]
+    particle_header += ["} mc_particle_type;", "#endif /* MCP_PARTICLES_H */", ""]
     packet_enum = {}
     packets = {}
 
@@ -1273,11 +1273,14 @@ def run(version):
     header = header_upper + header_lower + ["#endif", ""]
     impl = impl_upper + impl_lower + make_packet + [""]
 
-    with open("../include/particle_types.h", "w") as f:
+    if not os.path.exists("mcp"):
+        os.mkdir("mcp")
+
+    with open("mcp/particles.h", "w") as f:
         f.write('\n'.join(particle_header))
-    with open("../src/protocol.c", "w") as f:
+    with open("protocol.c", "w") as f:
         f.write('\n'.join(impl))
-    with open("../include/protocol.h", "w") as f:
+    with open("mcp/protocol.h", "w") as f:
         f.write('\n'.join(header))
 
 

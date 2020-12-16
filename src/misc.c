@@ -1,28 +1,20 @@
 /**
- * @file translation_utils.c
+ * @file misc.c
  * @author andersonarc (andersonarc@github.com)
- * @brief utilities required for transition from C++ to C
- * @version 0.1
+ * @brief miscelannous utilities
+ * @version 0.3
  * @date 2020-12-12
- * 
- * @copyright andersonarc
  */
     /* includes */
-#include "translation_utils.h" /* this */
+#include "mcp/misc.h" /* this */
 
 /**
  * @brief print message and exit with error
+ * 
+ * @param message message string
  */
 void runtime_error(string_t message) {
     fputs(message, stdout);
     fputs(message, stderr);
     exit(EXIT_FAILURE);
 }
-
-/**
- * todo
- * @brief nbt stubs 
- */
-void nbt_encode_full() {}
-void nbt_decode_full() {}
-void nbt_read_string() {}

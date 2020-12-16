@@ -1,17 +1,20 @@
 # mcpacket library build file
 
-## find required programs
+# project definition
+project('mcpacket', 'c', 
+    version: '0.3',
+    license: 'GPL3')
+
+# find required programs
 python = find_program('python')
 
-## generate build files
-
-### pip dependencies
+# pip dependencies
 dependencies = custom_target('dependencies',
     input: 'mcd2packet/requirements.txt', 
     output: 'requirements.lock', 
     command: [python, '-m', 'pip', 'install', '-r', '@INPUT@'])
 
-### generated sources and headers
+# generated sources and headers
 protocol = custom_target('protocol', 
     build_by_default: true,
     input: 'mcd2packet/mcd2packet.py', 
@@ -19,10 +22,15 @@ protocol = custom_target('protocol',
     depends: [dependencies],
     command: [python, '@INPUT@'])
 
-## prepare build files
-mcpacket_src = files('types.c', 'misc.c')
-mcpacket_include = include_directories('include')
+# prepare build files
+src = files('src/types.c', 'src/misc.c', 'src/nbt.c')
+include = include_directories('include')
 
-## compile library
-mcpacket = library('mcpacket', [mcpacket_src, protocol],
-    include_directories: [mcpacket_include])
+# compile library
+libmcpacket = library('mcpacket', [src, protocol],
+    include_directories: include)
+
+# create a dependency
+declare_dependency(
+    include_directories: include, 
+    link_with: libmcpacket)
