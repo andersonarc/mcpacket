@@ -31,6 +31,6 @@ libmcpacket = library('mcpacket', [src, protocol],
     include_directories: include)
 
 # create a dependency
-declare_dependency(
+libmcpacket_dep = declare_dependency(
     include_directories: include, 
     link_with: libmcpacket)
