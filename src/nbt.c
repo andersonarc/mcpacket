@@ -2,7 +2,7 @@
  * @file nbt.c
  * @author andersonarc (e.andersonarc@gmail.com)
  * @brief minecraft nbt tag parsing
- * @version 0.1
+ * @version 0.2
  * @date 2020-12-16
  */
     /* includes */
@@ -13,8 +13,8 @@
  * todo
  * @brief nbt stubs 
  */
-void nbt_encode_full(FILE* dest, nbt_tag_compound* this) {}
-void nbt_decode_full(FILE* src, nbt_tag_compound* this) {}
-nbt_tag_compound nbt_read_string(FILE* src) {
+void nbt_encode_full(stream_t dest, nbt_tag_compound* this) {}
+void nbt_decode_full(stream_t src, nbt_tag_compound* this) {}
+nbt_tag_compound nbt_read_string(stream_t src) {
     return NULL;
 }

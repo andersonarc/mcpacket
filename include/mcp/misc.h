@@ -2,7 +2,7 @@
  * @file misc.h
  * @author andersonarc (andersonarc@github.com)
  * @brief utilities required for transition from C++ to C
- * @version 0.3
+ * @version 0.4
  * @date 2020-12-07
  */
       /* header guard */
@@ -13,6 +13,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
+
+/**
+ * @brief socket descriptor as stream
+ */
+#define stream_t int
 
 /**
  * @brief string type
