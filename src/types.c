@@ -566,9 +566,9 @@ void enc_varint(stream_t dest, uint64_t src) {
 int64_t dec_varint(stream_t src) {
   uint64_t dest = 0;
   int i = 0;
-  uint64_t j;
+  uint64_t j = 0;
   read(src, &j, sizeof(uint8_t));
-  for(; j & 0x80; i+=7) {
+  for(; j & 0x80; i += 7) {
     read(src, &j, sizeof(uint8_t));
     dest |= (j & 0x7F) << i;
   }
