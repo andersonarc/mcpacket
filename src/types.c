@@ -576,6 +576,11 @@ int64_t dec_varint(stream_t src) {
   return (int64_t) dest;
 }
 
+/* todo:
+ * more informative comments here
+ * create packet constructor, write length byte and packet id byte before packet
+ */
+
 /**
  * @brief string
  */
@@ -586,8 +591,9 @@ void enc_string(stream_t dest, const char* src) {
 }
 MALLOC char* dec_string(stream_t src) {
   size_t length = (size_t) dec_varint(src);
-  char* string = malloc(length);
+  char* string = malloc(length + 1);
   read(src, string, length);
+  string[length] = 0;
   return string;
 }
 
