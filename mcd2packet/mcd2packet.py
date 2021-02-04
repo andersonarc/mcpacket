@@ -1288,17 +1288,9 @@ def run(version):
         ""
             ]
     header_lower = [
-        "extern const char* serverbound_handshaking_cstrings["
-        "MCP_SERVERBOUND_HANDSHAKING__MAX];",
-        "extern const char* clientbound_status_cstrings[MCP_CLIENTBOUND_STATUS__MAX];",
-        "extern const char* serverbound_status_cstrings[MCP_SERVERBOUND_STATUS__MAX];",
-        "extern const char* clientbound_login_cstrings[MCP_CLIENTBOUND_LOGIN__MAX];",
-        "extern const char* serverbound_login_cstrings[MCP_SERVERBOUND_LOGIN__MAX];",
-        "extern const char* clientbound_play_cstrings[MCP_CLIENTBOUND_PLAY__MAX];",
-        "extern const char* serverbound_play_cstrings[MCP_SERVERBOUND_PLAY__MAX];",
-        "",
-        "extern const char **protocol_cstrings[MCP_STATE__MAX][MCP_DIRECTION__MAX];",
-        "extern const int protocol_max_ids[MCP_STATE__MAX][MCP_DIRECTION__MAX];",
+        "extern const char** mcp_protocol_cstrings[MCP_STATE__MAX][MCP_DIRECTION__MAX];",
+        "extern mcp_packet_handler_t** mcp_protocol_handlers[MCP_STATE__MAX][MCP_DIRECTION__MAX]; // todo not sure that it works as expected",
+        "extern const int mcp_protocol_max_ids[MCP_STATE__MAX][MCP_DIRECTION__MAX];",
         "",
         "mcpacket_t* mcpacket_parse(mcpacket_state state, mcpacket_direction direction, int mcpacket_id);",
         ""
@@ -1339,7 +1331,7 @@ def run(version):
                 else:
                     packet_id = info[0]
                 pak = packet(state, direction, packet_id, info[1], packet_data)
-                if info[1] != "LegacyServerListPing":
+                if info[1] != "LegacyServerListPing": #todo LegacyServerListPing is not supported
                     packets[state][direction].append(pak)
                 header_lower += pak.declaration()
                 header_lower.append('')
@@ -1348,7 +1340,7 @@ def run(version):
                 impl_lower += pak.decoder()
                 impl_lower += pak.constructor()
                 impl_lower.append('')
-#todo not only typedef in methods, also define struct
+
     for state in mc_states: 
         for direction in mc_directions:
             dr = "clientbound" if direction == "toClient" else "serverbound"
@@ -1357,11 +1349,8 @@ def run(version):
             header_upper.extend(f"{indent}{l}," for l in packet_enum[state][direction])
             header_upper[-1] = header_upper[-1][:-1]
             header_upper.extend(("};", ""))
-            header_upper.append(f"mcp_packet_handler_t* mcp_{dr}_{state}_handlers[MCP_{dr.upper()}_{state.upper()}__MAX] = {{")
-            if len(packet_enum[state][direction]) > 1:
-                header_upper.extend([f"{indent}&mcp_blank_handler,"] * (len(packet_enum[state][direction]) - 1))
-                header_upper[-1] = header_upper[-1][:-1]
-            header_upper.extend(("};", ""))
+            header_upper.append(f"extern mcp_packet_handler_t* mcp_{dr}_{state}_handlers[MCP_{dr.upper()}_{state.upper()}__MAX];")
+            header_upper.append(f"extern const char* mcp_{dr}_{state}_cstrings[MCP_{dr.upper()}_{state.upper()}__MAX];")
 
     make_packet = [
         "mcpacket_t* mcpacket_parse(mcpacket_state state, mcpacket_direction direction, int mcpacket_id) {",
@@ -1401,6 +1390,11 @@ def run(version):
                     impl_upper.append(f"{indent}\"{pak.class_name}\",")
                 impl_upper[-1] = impl_upper[-1][:-1]
                 impl_upper.extend(("};", ""))
+                impl_upper.append(f"mcp_packet_handler_t* mcp_{dr}_{state}_handlers[MCP_{dr.upper()}_{state.upper()}__MAX] = {{")
+                if len(packet_enum[state][direction]) > 1:
+                    impl_upper.extend([f"{indent}&mcp_blank_handler,"] * (len(packet_enum[state][direction]) - 1))
+                    impl_upper[-1] = impl_upper[-1][:-1]
+                impl_upper.extend(("};", ""))
 
     impl_upper += [
         "const char** mcp_protocol_cstrings[MCP_STATE__MAX][MCP_DIRECTION__MAX] = {",
@@ -1408,6 +1402,13 @@ def run(version):
         f"{indent}{{mcp_serverbound_status_cstrings, mcp_clientbound_status_cstrings}},",
         f"{indent}{{mcp_serverbound_login_cstrings, mcp_clientbound_login_cstrings}},",
         f"{indent}{{mcp_serverbound_play_cstrings, mcp_clientbound_play_cstrings}}",
+        "};",
+        "",
+        "mcp_packet_handler_t** mcp_protocol_handlers[MCP_STATE__MAX][MCP_DIRECTION__MAX] = {",
+        f"{indent}{{mcp_serverbound_handshaking_handlers}},",
+        f"{indent}{{mcp_serverbound_status_handlers, mcp_clientbound_status_handlers}},",
+        f"{indent}{{mcp_serverbound_login_handlers, mcp_clientbound_login_handlers}},",
+        f"{indent}{{mcp_serverbound_play_handlers, mcp_clientbound_play_handlers}}",
         "};",
         "",
         "const int mcp_protocol_max_ids[MCP_STATE__MAX][MCP_DIRECTION__MAX] = {",
