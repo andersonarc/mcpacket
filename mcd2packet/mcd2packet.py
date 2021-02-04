@@ -1430,16 +1430,18 @@ def run(version):
     header = header_upper + header_lower + ["#endif /* MCP_PROTOCOL_H */", ""]
     impl = impl_upper + impl_lower + make_packet + [""]
 
-    if not os.path.exists("mcp"):
-        os.mkdir("mcp")
+    path = os.environ['MCP_PATH']
 
-    with open("mcp/particles.h", "w") as f:
+    if not os.path.exists(f"{path}/mcp"):
+        os.mkdir(f"{path}/mcp")
+
+    with open(f"{path}/mcp/particles.h", "w") as f:
         f.write('\n'.join(particle_header))
-    with open("protocol.c", "w") as f:
+    with open(f"{path}/protocol.c", "w") as f:
         f.write('\n'.join(impl))
-    with open("mcp/protocol.h", "w") as f:
+    with open(f"{path}/mcp/protocol.h", "w") as f:
         f.write('\n'.join(header))
 
 
 if __name__ == "__main__":
-    run(os.environ['MCPACKET_MINECRAFT_VERSION'])
+    run(os.environ['MCP_MC'])
