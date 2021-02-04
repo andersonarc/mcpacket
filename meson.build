@@ -2,7 +2,7 @@
 
 # project definition
 project('mcpacket', 'c', 
-    version: '0.4',
+    version: '0.5',
     license: 'GPL3')
 
 # find required programs

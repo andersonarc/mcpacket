@@ -512,6 +512,10 @@ MALLOC char* dec_string(stream_t src) {
   string[length] = 0;
   return string;
 }
+size_t size_string(const char* src) {
+  size_t length = strlen(src);
+  return size_varlong(length) + length;
+}
 
 /**
  * @brief buffer

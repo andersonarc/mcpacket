@@ -3,7 +3,7 @@
 # * @author SpockBotMC
 # * @author andersonarc (e.andersonarc@gmail.com)
 # * @brief minecraft data to C language converter
-# * @version 0.4
+# * @version 0.5
 # * @date 2020-12-12
 # */
 
@@ -15,6 +15,7 @@ import os
 indent = "  "
 
 mcd_type_map = {}
+#todo empty packet constructors for decoders
 type_pre_definitions = dict(
     char_vector_t="",
     int32_t_vector_t="",
@@ -93,6 +94,12 @@ class generic_type:
         self.compare_name = name
         self.use_compare = use_compare
 
+    def parameter(self):
+        return f"{self.typename} {self.name}",
+
+    def length(self):
+        return f"sizeof({self.name})"
+
     def declaration(self):
         return f"{self.typename} {self.name};",
 
@@ -100,13 +107,7 @@ class generic_type:
         return f"{self.typename} {self.name} = {val};",
 
     def encoder(self):
-        length_encoder = f"this->mcpacket.length += sizeof({self.name});"
-        if self.postfix == "varint":
-            length_encoder = f"this->mcpacket.length += size_varlong({self.name});"
-        return (
-            f"enc_{self.postfix}(dest, {self.name});",
-            length_encoder  
-        )
+        return f"enc_{self.postfix}(dest, {self.name});",
 
     def decoder(self):
         if self.name:
@@ -260,6 +261,9 @@ class mc_varint(numeric_type):
     typename = 'int64_t'
     postfix = 'varint'
 
+    def length(self):
+        return f"size_varint({self.name})"
+
 
 @mc_data_name('varlong')
 class mc_varlong(numeric_type):
@@ -267,11 +271,17 @@ class mc_varlong(numeric_type):
     # Decoding varlongs is the same as decoding varints
     postfix = 'varint'
 
+    def length(self):
+        return f"size_varlong({self.name})"
+
 
 @mc_data_name('string')
 class mc_string(simple_type):
     typename = 'string_t'
     postfix = 'string'
+
+    def length(self):
+        return f"size_string({self.name})"
 
 
 @mc_data_name('buffer')
@@ -281,18 +291,19 @@ class mc_buffer(simple_type):
 
     def __init__(self, name, parent, type_data, use_compare=False):
         super().__init__(name, parent, type_data, use_compare)
-        self.count = mcd_type_map[type_data['countType']].postfix
+        self.count = mcd_type_map[type_data['countType']]
+
+    def length(self):
+        return f"({self.count(self.name + '.size', self).length()} + sizeof(*{self.name}.data) * {self.name}.size)"
 
     def encoder(self):
         return (
-            f"enc_{self.count}(dest, {self.name}.size);",
-            f"this->mcpacket.length += sizeof({self.name}.size);", 
+            f"enc_{self.count.postfix}(dest, {self.name}.size);",
             f"enc_buffer(dest, {self.name});",
-            f"this->mcpacket.length += sizeof(*{self.name}.data) * {self.name}.size;"
         )
 
     def decoder(self):
-        return f"{self.name} = dec_buffer(src, dec_{self.count}(src));",
+        return f"{self.name} = dec_buffer(src, dec_{self.count.postfix}(src));",
 
 
 @mc_data_name('restBuffer')
@@ -300,13 +311,13 @@ class mc_rest_buffer(simple_type):
     typename = 'char_vector_t'
     postfix = 'buffer'
 
-    def encoder(self):
-        return (
-            f"stream_write(dest, {self.name}.data, {self.name}.size);",
-            f"this->mcpacket.length += sizeof(*{self.name}.data) * {self.name}.size;"
-        )
+    def length(self):
+        return f"(sizeof(*{self.name}.data) * {self.name}.size)"
 
-    #todo read, use packet length value minus already read?
+    def encoder(self):
+        return f"stream_write(dest, {self.name}.data, {self.name}.size);",
+
+    #todo use packet length value minus already read?
     def decoder(self):
         return f"{self.name}.size = 0;",
         # return (
@@ -319,8 +330,11 @@ class mc_rest_buffer(simple_type):
 class mc_nbt(simple_type):
     typename = 'nbt_tag_compound'
 
+    def length(self):
+        return f"0 /* todo nbt length */"
+
     def encoder(self):
-        return f"nbt_encode_full(dest, {self.name});", #todo length
+        return f"nbt_encode_full(dest, {self.name});", 
 
     def decoder(self):
         return f"nbt_decode_full(src, {self.name});",
@@ -328,8 +342,10 @@ class mc_nbt(simple_type):
 
 @mc_data_name('optionalNbt')
 class mc_optional_nbt(simple_type):
-    # DECLARE(TagCompound) optional
     typename = 'nbt_tag_compound_optional_t'
+
+    def length(self):
+        return f"0 /* todo nbt length */"
 
     def encoder(self):
         return (
@@ -404,11 +420,13 @@ class vector_type(simple_type):
             self.depth += 1
             p = p.parent
 
+    def length(self):
+        return f"({self.count(self.name + '.size', self).length()} + sizeof(*{self.name}.data) * {self.name}.size)"
+
     def encoder(self):
         iterator = f"i{self.depth}"
         return (
             f"enc_{self.count.postfix}(dest, {self.name}.size);",
-            f"this->mcpacket.length += sizeof({self.name}.size);", 
             f"for (int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
             f"{indent}{self.element}_encode(dest, &{self.name}.data[{iterator}]);",
             "}",
@@ -458,15 +476,18 @@ class mc_option(simple_type):
         type_definitions[self.typename].append(f"optional_typedef({self.field.name})")
         return [f"{self.typename} {self.name};"]
 
+    def length(self):
+        self.field.name = f"{self.name}.value"
+        return f"(sizeof({self.name}.has_value) + {self.field.length()})"
+
     def encoder(self):
         self.field.name = f"{self.name}.value"
-        return [
+        return (
             f"enc_byte(dest, {self.name}.has_value);",
-            f"this->mcpacket.length += sizeof(uint8_t);", 
             f"if ({self.name}.has_value) {{",
             *(indent + line for line in self.field.encoder()),
             "}"
-        ]
+        )
 
     def decoder(self):
         ret = [f"if (dec_byte(src)) {{"]
@@ -482,6 +503,9 @@ class mc_option(simple_type):
 
 
 class complex_type(generic_type):
+    def length(self):
+        return "(" + reduce(lambda a, b: f"{a} + {b}", list(f.length() for f in self.fields), "0") + ")"
+    
     def declaration(self):
         if self.name:
             result = self.internal_is_gtype_defined()
@@ -578,6 +602,9 @@ class mc_bitfield(complex_type):
         self.storage = lookup_unsigned[total](f"{name}_", self)
         self.size = total // 8
 
+    def length(self):
+        return f"sizeof({self.storage.typename})"
+
     def encoder(self):
         ret = [*self.storage.initialization("0")]
         name = f"{self.name}." if self.name else ""
@@ -665,19 +692,38 @@ class mc_switch(simple_type):
             return []
         return [l for f in self.fields for l in f.declaration()]
 
+    def length(self):
+        has_name = hasattr(self.parent, 'name') and self.parent.name
+        if has_name and self.parent.name.endswith("->"):
+            suffix = ""
+        else:
+            suffix = "."
+        ret = ""
+        for field in self.fields:
+            if has_name:
+                field.temp_name(f"{self.parent.name}{suffix}{field.name}")
+            ret += f"{field.length()} +"
+            if has_name:
+                field.reset_name()
+        if len(ret) < 2:
+            return "0"
+        return f"({ret[:-2]})"
+
     def code_fields(self, ret, fields, encode=True):
-        if hasattr(self.parent, 'name') and self.parent.name.endswith("->"):
+        has_name = hasattr(self.parent, 'name') and self.parent.name
+        if has_name and self.parent.name.endswith("->"):
             suffix = ""
         else:
             suffix = "."
         for field in fields:
-            if hasattr(self.parent, 'name') and self.parent.name:
+            if has_name:
                 field.temp_name(f"{self.parent.name}{suffix}{field.name}")
             if encode:
                 ret.extend(f"{indent}{l}" for l in field.encoder())
             else:
                 ret.extend(f"{indent}{l}" for l in field.decoder())
-            field.reset_name()
+            if has_name:
+                field.reset_name()
         return ret
 
     def inverse(self, comp, encode=True):
@@ -868,6 +914,14 @@ class mc_array(simple_type):
 
         self.typename = f"{self.f_type}_vector_t"
 
+    def length(self):
+        if self.is_fixed:
+            return f"(sizeof(*{self.name}.data) * {self.name}.size)"
+        if self.is_prefixed:
+            self.count.name = f"{self.name}.size"
+            return f"({self.count.length()} + sizeof(*{self.name}.data) * {self.name}.size)"
+        return f"(sizeof(*{self.name}.data) * {self.name}.size)"
+
     def declaration(self):
         ret = []
         if isinstance(self.field, simple_type):
@@ -1036,6 +1090,11 @@ def get_encoder(field):
     field.reset_name()
     return string
 
+def get_length(field):
+    field.temp_name("this->" + field.name)
+    string = field.length()
+    field.reset_name()
+    return string
 
 class packet:
     def __init__(self, state, direction, packet_id, packet_name, data):
@@ -1050,6 +1109,9 @@ class packet:
         for data_field in data:
             f_name, f_type, f_data = extract_field(data_field)
             self.fields.append(mcd_type_map[f_type](f_name, self, f_data))
+
+    def length(self):
+        return "(" + reduce(lambda a, b: f"{a} + {b}", list(get_length(f) for f in self.fields), "0") + ")"
 
     def declaration(self): 
         declaration = ''
@@ -1076,7 +1138,8 @@ class packet:
     def encoder(self):
         return [
             f"void {self.class_name}_encode(stream_t dest, {self.class_name}* this) {{",
-            f"{indent}enc_varint(dest, this->mcpacket.length + size_varlong(this->mcpacket.id));",
+            f"{indent}this->mcpacket.length = ({self.length()}) + size_varlong(this->mcpacket.id);",
+            f"{indent}enc_varint(dest, this->mcpacket.length);",
             f"{indent}enc_varint(dest, this->mcpacket.id);",
             *(indent + l for f in self.fields for l in get_encoder(f)),
             "}"
@@ -1087,8 +1150,8 @@ class packet:
             f"void {self.class_name}_decode(stream_t src, {self.class_name}* this) {{",
             f"{indent}this->mcpacket.length = dec_varint(src);",
             f"{indent}if (this->mcpacket.id != dec_varint(src)) {{",
-            f"{indent}{indent}runtime_error(\"mcpacket: {self.class_name}_decode: incoming packet id differs with local\");",
-            "}",
+            f"{indent}{indent}runtime_error(\"mcpacket: {self.class_name}_decode: incoming packet id differs with local\\n\");",
+            f"{indent}}}",
             *(indent + l for f in self.fields for l in get_decoder(f)),
             "}"
         ]
@@ -1126,7 +1189,7 @@ warning_header = (
     " * @author SpockBotMC",
     " * @author andersonarc (e.andersonarc@gmail.com)",
     " * @brief generated by mcd2packet protocol specification",
-    " * @version 0.4",
+    " * @version 0.5",
     " * @date 2020-12-12",
     " */"
 )
@@ -1137,7 +1200,7 @@ warning_impl = (
     " * @author SpockBotMC",
     " * @author andersonarc (e.andersonarc@gmail.com)",
     " * @brief generated by mcd2packet protocol specification",
-    " * @version 0.4",
+    " * @version 0.5",
     " * @date 2020-12-12",
     " */"
 )
@@ -1185,8 +1248,8 @@ def run(version):
     proto = mcd.protocol
     header_upper = [
         *warning_header,
-        "#ifndef PROTOCOL_H",
-        "#define PROTOCOL_H",
+        "#ifndef MCP_PROTOCOL_H",
+        "#define MCP_PROTOCOL_H",
         "",
         "#include <stdint.h>",
         "#include <malloc.h>",
@@ -1204,7 +1267,7 @@ def run(version):
         "typedef enum mcpacket_direction {",
         "  MCP_DIRECTION_SERVERBOUND,",
         "  MCP_DIRECTION_CLIENTBOUND,",
-        "  MCP_DIRECTION_MAX",
+        "  MCP_DIRECTION__MAX",
         "} mcpacket_direction;",
         "",
         "typedef enum mcpacket_state {",
@@ -1212,7 +1275,7 @@ def run(version):
         "  MCP_STATE_STATUS,",
         "  MCP_STATE_LOGIN,",
         "  MCP_STATE_PLAY,",
-        "  MCP_STATE_MAX",
+        "  MCP_STATE__MAX",
         "} mcpacket_state;",
         "",
         "typedef struct mcpacket_t {",
@@ -1226,16 +1289,16 @@ def run(version):
             ]
     header_lower = [
         "extern const char* serverbound_handshaking_cstrings["
-        "MCP_SERVERBOUND_HANDSHAKING_MAX];",
-        "extern const char* clientbound_status_cstrings[MCP_CLIENTBOUND_STATUS_MAX];",
-        "extern const char* serverbound_status_cstrings[MCP_SERVERBOUND_STATUS_MAX];",
-        "extern const char* clientbound_login_cstrings[MCP_CLIENTBOUND_LOGIN_MAX];",
-        "extern const char* serverbound_login_cstrings[MCP_SERVERBOUND_LOGIN_MAX];",
-        "extern const char* clientbound_play_cstrings[MCP_CLIENTBOUND_PLAY_MAX];",
-        "extern const char* serverbound_play_cstrings[MCP_SERVERBOUND_PLAY_MAX];",
+        "MCP_SERVERBOUND_HANDSHAKING__MAX];",
+        "extern const char* clientbound_status_cstrings[MCP_CLIENTBOUND_STATUS__MAX];",
+        "extern const char* serverbound_status_cstrings[MCP_SERVERBOUND_STATUS__MAX];",
+        "extern const char* clientbound_login_cstrings[MCP_CLIENTBOUND_LOGIN__MAX];",
+        "extern const char* serverbound_login_cstrings[MCP_SERVERBOUND_LOGIN__MAX];",
+        "extern const char* clientbound_play_cstrings[MCP_CLIENTBOUND_PLAY__MAX];",
+        "extern const char* serverbound_play_cstrings[MCP_SERVERBOUND_PLAY__MAX];",
         "",
-        "extern const char **protocol_cstrings[MCP_STATE_MAX][MCP_DIRECTION_MAX];",
-        "extern const int protocol_max_ids[MCP_STATE_MAX][MCP_DIRECTION_MAX];",
+        "extern const char **protocol_cstrings[MCP_STATE__MAX][MCP_DIRECTION__MAX];",
+        "extern const int protocol_max_ids[MCP_STATE__MAX][MCP_DIRECTION__MAX];",
         "",
         "mcpacket_t* mcpacket_parse(mcpacket_state state, mcpacket_direction direction, int mcpacket_id);",
         ""
@@ -1289,12 +1352,12 @@ def run(version):
     for state in mc_states: 
         for direction in mc_directions:
             dr = "clientbound" if direction == "toClient" else "serverbound"
-            packet_enum[state][direction].append(f"MCP_{dr.upper()}_{state.upper()}_MAX")
+            packet_enum[state][direction].append(f"MCP_{dr.upper()}_{state.upper()}__MAX")
             header_upper.append(f"enum mcp_{dr}_{state}_ids {{")
             header_upper.extend(f"{indent}{l}," for l in packet_enum[state][direction])
             header_upper[-1] = header_upper[-1][:-1]
             header_upper.extend(("};", ""))
-            header_upper.append(f"mcp_packet_handler_t* mcp_{dr}_{state}_handlers[MCP_{dr.upper()}_{state.upper()}_MAX] = {{")
+            header_upper.append(f"mcp_packet_handler_t* mcp_{dr}_{state}_handlers[MCP_{dr.upper()}_{state.upper()}__MAX] = {{")
             if len(packet_enum[state][direction]) > 1:
                 header_upper.extend([f"{indent}&mcp_blank_handler,"] * (len(packet_enum[state][direction]) - 1))
                 header_upper[-1] = header_upper[-1][:-1]
@@ -1340,18 +1403,18 @@ def run(version):
                 impl_upper.extend(("};", ""))
 
     impl_upper += [
-        "const char** mcp_protocol_cstrings[MCP_STATE_MAX][MCP_DIRECTION_MAX] = {",
+        "const char** mcp_protocol_cstrings[MCP_STATE__MAX][MCP_DIRECTION__MAX] = {",
         f"{indent}{{mcp_serverbound_handshaking_cstrings}},",
         f"{indent}{{mcp_serverbound_status_cstrings, mcp_clientbound_status_cstrings}},",
         f"{indent}{{mcp_serverbound_login_cstrings, mcp_clientbound_login_cstrings}},",
         f"{indent}{{mcp_serverbound_play_cstrings, mcp_clientbound_play_cstrings}}",
         "};",
         "",
-        "const int mcp_protocol_max_ids[MCP_STATE_MAX][MCP_DIRECTION_MAX] = {",
-        f"{indent}{{MCP_SERVERBOUND_HANDSHAKING_MAX, MCP_CLIENTBOUND_HANDSHAKING_MAX}},",
-        f"{indent}{{MCP_SERVERBOUND_STATUS_MAX, MCP_CLIENTBOUND_STATUS_MAX}},",
-        f"{indent}{{MCP_SERVERBOUND_LOGIN_MAX, MCP_CLIENTBOUND_LOGIN_MAX}},",
-        f"{indent}{{MCP_SERVERBOUND_PLAY_MAX, MCP_CLIENTBOUND_PLAY_MAX}}",
+        "const int mcp_protocol_max_ids[MCP_STATE__MAX][MCP_DIRECTION__MAX] = {",
+        f"{indent}{{MCP_SERVERBOUND_HANDSHAKING__MAX, MCP_CLIENTBOUND_HANDSHAKING__MAX}},",
+        f"{indent}{{MCP_SERVERBOUND_STATUS__MAX, MCP_CLIENTBOUND_STATUS__MAX}},",
+        f"{indent}{{MCP_SERVERBOUND_LOGIN__MAX, MCP_CLIENTBOUND_LOGIN__MAX}},",
+        f"{indent}{{MCP_SERVERBOUND_PLAY__MAX, MCP_CLIENTBOUND_PLAY__MAX}}",
         "};",
         "",
     ]
@@ -1363,7 +1426,7 @@ def run(version):
         header_upper.extend(type_definitions[type_definition])
         header_upper.append(' ')
 
-    header = header_upper + header_lower + ["#endif", ""]
+    header = header_upper + header_lower + ["#endif /* MCP_PROTOCOL_H */", ""]
     impl = impl_upper + impl_lower + make_packet + [""]
 
     if not os.path.exists("mcp"):

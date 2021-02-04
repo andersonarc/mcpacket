@@ -204,6 +204,7 @@ double dec_lef64(stream_t src);
  */
 void enc_string(stream_t dest, const char* src);
 char* dec_string(stream_t src);
+size_t size_string(const char* src);
 
 /**
  * @brief buffer
