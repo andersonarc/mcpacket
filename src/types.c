@@ -3,15 +3,19 @@
  * @author SpockBotMC
  * @author andersonarc (e.andersonarc@gmail.com)
  * @brief data structures and encoders/decoders for minecraft data types
- * @version 0.4
+ * @version 0.5
  * @date 2020-12-14
  */
       /* includes */
 #include "mcp/types.h" /* this */
 
+#include <endian.h> /* byte swap */ 
+#include <string.h> /* string operations */ 
+#include <malloc.h> /* memory allocation */ 
+
       /* minecraft data encoders and decoders */
 /**
- * @brief minecraft UUID
+ * @brief minecraft uuid
  */
 void enc_uuid(stream_t dest, mc_uuid src) {
   enc_be64(dest, src.msb);
@@ -355,11 +359,11 @@ void mc_entity_metadata_decode(stream_t src, mc_entity_metadata* this) {
  * @brief uint8
  */
 void enc_byte(stream_t dest, const uint8_t src) {
-  write(dest, &src, sizeof(uint8_t));
+  stream_write_variable(dest, src);
 }
 uint8_t dec_byte(stream_t src) {
   uint8_t dest;
-  read(src, &dest, sizeof(uint8_t));
+  stream_read_variable(src, dest);
   return dest;
 }
 
@@ -368,11 +372,11 @@ uint8_t dec_byte(stream_t src) {
  */
 void enc_be16(stream_t dest, uint16_t src) {
   src = htobe16(src);
-  write(dest, &src, sizeof(uint16_t));
+  stream_write_variable(dest, src);
 }
 uint16_t dec_be16(stream_t src) {
   uint16_t dest;
-  read(src, &dest, sizeof(uint16_t));
+  stream_read_variable(src, dest);
   return be16toh(dest);
 }
 
@@ -381,11 +385,11 @@ uint16_t dec_be16(stream_t src) {
  */
 void enc_le16(stream_t dest, uint16_t src) {
   src = htole16(src);
-  write(dest, &src, sizeof(uint16_t));
+  stream_write_variable(dest, src);
 }
 uint16_t dec_le16(stream_t src) {
   uint16_t dest;
-  read(src, &dest, sizeof(uint16_t));
+  stream_read_variable(src, dest);
   return le16toh(dest);
 }
 
@@ -394,11 +398,11 @@ uint16_t dec_le16(stream_t src) {
  */
 void enc_be32(stream_t dest, uint32_t src) {
   src = htobe32(src);
-  write(dest, &src, sizeof(uint32_t));
+  stream_write_variable(dest, src);
 }
 uint32_t dec_be32(stream_t src) {
   uint32_t dest;
-  read(src, &dest, sizeof(uint32_t));
+  stream_read_variable(src, dest);
   return be32toh(dest);
 }
 
@@ -407,11 +411,11 @@ uint32_t dec_be32(stream_t src) {
  */
 void enc_le32(stream_t dest, uint32_t src) {
   src = htole32(src);
-  write(dest, &src, sizeof(uint32_t));
+  stream_write_variable(dest, src);
 }
 uint32_t dec_le32(stream_t src) {
   uint32_t dest;
-  read(src, &dest, sizeof(uint32_t));
+  stream_read_variable(src, dest);
   return le32toh(dest);
 }
 
@@ -420,11 +424,11 @@ uint32_t dec_le32(stream_t src) {
  */
 void enc_be64(stream_t dest, uint64_t src) {
   src = htobe64(src);
-  write(dest, &src, sizeof(uint64_t));
+  stream_write_variable(dest, src);
 }
 uint64_t dec_be64(stream_t src) {
   uint64_t dest;
-  read(src, &dest, sizeof(uint64_t));
+  stream_read_variable(src, dest);
   return be64toh(dest);
 }
 
@@ -433,11 +437,11 @@ uint64_t dec_be64(stream_t src) {
  */
 void enc_le64(stream_t dest, uint64_t src) {
   src = htole64(src);
-  write(dest, &src, sizeof(uint64_t));
+  stream_write_variable(dest, src);
 }
 uint64_t dec_le64(stream_t src) {
   uint64_t dest;
-  read(src, &dest, sizeof(uint64_t));
+  stream_read_variable(src, dest);
   return le64toh(dest);
 }
 
@@ -446,11 +450,11 @@ uint64_t dec_le64(stream_t src) {
  */
 void enc_bef32(stream_t dest, float src) {
   uint32_t tmp = htobe32((uint32_t) src);
-  write(dest, &tmp, sizeof(uint32_t));
+  stream_write_variable(dest, tmp);
 }
 float dec_bef32(stream_t src) {
   uint32_t dest;
-  read(src, &dest, sizeof(uint32_t));
+  stream_read_variable(src, dest);
   return (float) be32toh(dest);
 }
 
@@ -459,11 +463,11 @@ float dec_bef32(stream_t src) {
  */
 void enc_lef32(stream_t dest, float src) {
   uint32_t tmp = htole32((uint32_t) src);
-  write(dest, &tmp, sizeof(uint32_t));
+  stream_write_variable(dest, tmp);
 }
 float dec_lef32(stream_t src) {
   uint32_t dest;
-  read(src, &dest, sizeof(uint32_t));
+  stream_read_variable(src, dest);
   return (float) le32toh(dest);
 }
 
@@ -472,11 +476,11 @@ float dec_lef32(stream_t src) {
  */
 void enc_bef64(stream_t dest, double src) {
   uint64_t tmp = htobe64((uint64_t) src);
-  write(dest, &tmp, sizeof(uint64_t));
+  stream_write_variable(dest, tmp);
 }
 double dec_bef64(stream_t src) {
   uint64_t dest;
-  read(src, &dest, sizeof(uint64_t));
+  stream_read_variable(src, dest);
   return (double) be32toh(dest);
 }
 
@@ -485,14 +489,45 @@ double dec_bef64(stream_t src) {
  */
 void enc_lef64(stream_t dest, double src) {
   uint64_t tmp = htole64((uint64_t) src);
-  write(dest, &tmp, sizeof(uint64_t));
+  stream_write_variable(dest, tmp);
 }
 double dec_lef64(stream_t src) {
   uint64_t dest;
-  read(src, &dest, sizeof(uint64_t));
+  stream_read_variable(src, dest);
   return (double) le64toh(dest);
 }
 
+/**
+ * @brief string
+ */
+void enc_string(stream_t dest, const char* src) {
+  size_t length = strlen(src);
+  enc_varint(dest, length);
+  stream_write(dest, src, length);
+}
+MALLOC char* dec_string(stream_t src) {
+  size_t length = (size_t) dec_varint(src);
+  char* string = malloc(length + 1);
+  stream_read(src, string, length);
+  string[length] = 0;
+  return string;
+}
+
+/**
+ * @brief buffer
+ */
+void enc_buffer(stream_t dest, const char_vector_t src) {
+  stream_write(dest, src.data, src.size);
+}
+MALLOC char_vector_t dec_buffer(stream_t src, size_t len) {
+  char_vector_t dest;
+  dest.size = len;
+  dest.data = malloc(sizeof(char) * len);
+  stream_read(src, dest.data, dest.size);
+  return dest;
+}
+
+      /* variable sized integer parser, encoder and decoder */
 /**
  * @brief varnum parsing utilities
  */
@@ -516,7 +551,7 @@ int verify_varlong(const char *buf, size_t max_len) {
 }
 
 /**
- * @brief get varnum size
+ * @brief calculate varnum size for fixed integer
  */
 size_t size_varint(uint32_t varint) {
   if(varint < (1 << 7))
@@ -552,61 +587,28 @@ size_t size_varlong(uint64_t varlong) {
 }
 
 /**
- * @brief variable size integer
+ * @brief variable sized integer encoder and decoder
  */
 void enc_varint(stream_t dest, uint64_t src) {
   uint8_t tmp;
   for(; src >= 0x80; src >>= 7) {
     tmp = 0x80 | (src & 0x7F);
-    write(dest, &tmp, sizeof(uint8_t));
+    stream_write_variable(dest, tmp);
   }
   tmp = src & 0x7F;
-  write(dest, &tmp, sizeof(uint8_t));
+  stream_write_variable(dest, tmp);
 }
 int64_t dec_varint(stream_t src) {
   uint64_t dest = 0;
   int i = 0;
   uint64_t j = 0;
-  read(src, &j, sizeof(uint8_t));
+  stream_read(src, &j, SINGLE_BYTE);
   for(; j & 0x80; i += 7) {
-    read(src, &j, sizeof(uint8_t));
+    stream_read(src, &j, SINGLE_BYTE);
     dest |= (j & 0x7F) << i;
   }
   dest |= j << i;
   return (int64_t) dest;
 }
 
-/* todo:
- * more informative comments here
- * create packet constructor, write length byte and packet id byte before packet
- */
-
-/**
- * @brief string
- */
-void enc_string(stream_t dest, const char* src) {
-  size_t length = strlen(src);
-  enc_varint(dest, length);
-  write(dest, src, length);
-}
-MALLOC char* dec_string(stream_t src) {
-  size_t length = (size_t) dec_varint(src);
-  char* string = malloc(length + 1);
-  read(src, string, length);
-  string[length] = 0;
-  return string;
-}
-
-/**
- * @brief buffer
- */
-void enc_buffer(stream_t dest, const char_vector_t src) {
-  write(dest, src.data, src.size);
-}
-MALLOC char_vector_t dec_buffer(stream_t src, size_t len) {
-  char_vector_t dest;
-  dest.size = len;
-  dest.data = malloc(sizeof(char) * len);
-  read(src, dest.data, dest.size);
-  return dest;
-}
+/* todo create packet constructor, write length byte and packet id byte before packet */

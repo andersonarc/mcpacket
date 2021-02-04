@@ -3,10 +3,11 @@
 # * @author SpockBotMC
 # * @author andersonarc (e.andersonarc@gmail.com)
 # * @brief minecraft data to C language converter
-# * @version 0.3
+# * @version 0.4
 # * @date 2020-12-12
 # */
 
+from functools import reduce
 import minecraft_data
 import re
 import os
@@ -99,7 +100,13 @@ class generic_type:
         return f"{self.typename} {self.name} = {val};",
 
     def encoder(self):
-        return f"enc_{self.postfix}(dest, {self.name});",
+        length_encoder = f"this->mcpacket.length += sizeof({self.name});"
+        if self.postfix == "varint":
+            length_encoder = f"this->mcpacket.length += size_varlong({self.name});"
+        return (
+            f"enc_{self.postfix}(dest, {self.name});",
+            length_encoder  
+        )
 
     def decoder(self):
         if self.name:
@@ -279,7 +286,9 @@ class mc_buffer(simple_type):
     def encoder(self):
         return (
             f"enc_{self.count}(dest, {self.name}.size);",
+            f"this->mcpacket.length += sizeof({self.name}.size);", 
             f"enc_buffer(dest, {self.name});",
+            f"this->mcpacket.length += sizeof(*{self.name}.data) * {self.name}.size;"
         )
 
     def decoder(self):
@@ -292,10 +301,14 @@ class mc_rest_buffer(simple_type):
     postfix = 'buffer'
 
     def encoder(self):
-        return f"write(dest, {self.name}.data, {self.name}.size);",
+        return (
+            f"stream_write(dest, {self.name}.data, {self.name}.size);",
+            f"this->mcpacket.length += sizeof(*{self.name}.data) * {self.name}.size;"
+        )
 
+    #todo read, use packet length value minus already read?
     def decoder(self):
-        return f"{self.name}.size = 0; /* todo */",
+        return f"{self.name}.size = 0;",
         # return (
         #  f"{self.name} = std::vector<char>(std::istreambuf_iterator<char>(src),",
         #    indent * 2 + f"std::istreambuf_iterator<char>());"
@@ -307,7 +320,7 @@ class mc_nbt(simple_type):
     typename = 'nbt_tag_compound'
 
     def encoder(self):
-        return f"nbt_encode_full(dest, {self.name});",
+        return f"nbt_encode_full(dest, {self.name});", #todo length
 
     def decoder(self):
         return f"nbt_decode_full(src, {self.name});",
@@ -321,7 +334,7 @@ class mc_optional_nbt(simple_type):
     def encoder(self):
         return (
             f"if ({self.name}.has_value) {{",
-            f"{indent}nbt_encode_full(dest, {self.name}.value);",
+            f"{indent}nbt_encode_full(dest, {self.name}.value);", #todo length
             f"}} else {{",
             f"{indent}enc_byte(dest, NBT_TAG_END);",
             "}"
@@ -395,9 +408,10 @@ class vector_type(simple_type):
         iterator = f"i{self.depth}"
         return (
             f"enc_{self.count.postfix}(dest, {self.name}.size);",
+            f"this->mcpacket.length += sizeof({self.name}.size);", 
             f"for (int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
             f"{indent}{self.element}_encode(dest, &{self.name}.data[{iterator}]);",
-            "}"
+            "}",
         )
 
     def decoder(self):
@@ -448,6 +462,7 @@ class mc_option(simple_type):
         self.field.name = f"{self.name}.value"
         return [
             f"enc_byte(dest, {self.name}.has_value);",
+            f"this->mcpacket.length += sizeof(uint8_t);", 
             f"if ({self.name}.has_value) {{",
             *(indent + line for line in self.field.encoder()),
             "}"
@@ -469,6 +484,36 @@ class mc_option(simple_type):
 class complex_type(generic_type):
     def declaration(self):
         if self.name:
+            result = self.internal_is_gtype_defined()
+            if result == 0:
+                return [f"{self.name}_gtype {self.name};"]
+
+            code = ''
+            if result == 2:
+                code = str(abs(hash(str(self.fields))))[:2]
+            name = f"{self.name}_g{code}type"
+
+            self.temp_name(name)
+            type_definitions[self.name] = self.typedef()
+            self.reset_name()
+            return [f"{name} {self.name};"]
+        return self.internal_declaration()
+
+    def internal_is_gtype_defined(self):
+        self.temp_name(f"{self.name}_gtype")
+        if self.name in type_definitions:
+            if type_definitions[self.name] == self.typedef():
+                code = 0 # no need to create a typedef
+            else:
+                code = 2 # create a new typedef with hash
+        else:
+            code = 1 # create a new typedef without hash
+        self.reset_name()
+        return code
+
+
+    def internal_declaration(self):
+        if self.name:
             return [
                 "struct {",
                 *(indent + l for f in self.fields for l in f.declaration()),
@@ -477,7 +522,7 @@ class complex_type(generic_type):
         return [l for f in self.fields for l in f.declaration()]
 
     def typedef(self):
-        ret = self.declaration()
+        ret = self.internal_declaration()
         ret[0] = f"typedef {ret[0]}"
         return ret
 
@@ -820,6 +865,7 @@ class mc_array(simple_type):
             self.f_type = self.field.typename
         else:
             self.f_type = self.field.name
+
         self.typename = f"{self.f_type}_vector_t"
 
     def declaration(self):
@@ -835,7 +881,7 @@ class mc_array(simple_type):
             self.f_type = self.field.name
             type_definitions[f"{self.field.name}_vector_t"].append(f"vector_typedef({self.f_type})")
         if self.is_fixed:
-            ret.append(f"{typename} {self.name}; /* {self.count}> */")
+            ret.append(f"{typename} {self.name} /* {self.count} length */;")
         else:
             ret.append(f"{typename} {self.name};")
         return ret
@@ -1005,19 +1051,33 @@ class packet:
             f_name, f_type, f_data = extract_field(data_field)
             self.fields.append(mcd_type_map[f_type](f_name, self, f_data))
 
-    def declaration(self):
+    def declaration(self): 
+        declaration = ''
+        constructor = ''
+        for field in self.fields:
+            for line in field.declaration():
+                declaration += f"{indent}{line}\n"
+                constructor += line
+        declaration = declaration[:-1]
+        constructor = constructor.replace(";", ", ")[:-2]
+        if len(constructor) > 0:
+            constructor = ', ' + constructor
+
         return [
             f"typedef struct {self.class_name} {{",
-            f"{indent}PACKET",
-            *(indent + l for f in self.fields for l in f.declaration()),
+            f"{indent}mcpacket_t mcpacket;",
+            declaration,
             f"}} {self.class_name};",
-            f"void {self.class_name}_encode(stream_t dest, {self.class_name}* this);",
+            f"void {self.class_name}_new({self.class_name}* this{constructor});",
+            f"void {self.class_name}_encode(stream_t dest, {self.class_name}* this);", 
             f"void {self.class_name}_decode(stream_t src, {self.class_name}* this);",
         ]
 
     def encoder(self):
         return [
             f"void {self.class_name}_encode(stream_t dest, {self.class_name}* this) {{",
+            f"{indent}enc_varint(dest, this->mcpacket.length + size_varlong(this->mcpacket.id));",
+            f"{indent}enc_varint(dest, this->mcpacket.id);",
             *(indent + l for f in self.fields for l in get_encoder(f)),
             "}"
         ]
@@ -1025,7 +1085,34 @@ class packet:
     def decoder(self):
         return [
             f"void {self.class_name}_decode(stream_t src, {self.class_name}* this) {{",
+            f"{indent}this->mcpacket.length = dec_varint(src);",
+            f"{indent}if (this->mcpacket.id != dec_varint(src)) {{",
+            f"{indent}{indent}runtime_error(\"mcpacket: {self.class_name}_decode: incoming packet id differs with local\");",
+            "}",
             *(indent + l for f in self.fields for l in get_decoder(f)),
+            "}"
+        ]
+
+    def constructor(self):
+        fields = ''
+        constructor = ''
+        for field in self.fields:
+            fields += f"{indent}this->{field.name} = {field.name};\n"
+            for line in field.declaration():
+                constructor += line
+        fields = fields[:-1]
+        constructor = constructor.replace(";", ", ")[:-2]
+        if len(constructor) > 0:
+            constructor = ', ' + constructor
+
+        return [
+            f"void {self.class_name}_new({self.class_name}* this{constructor}) {{",
+            f"{indent}this->mcpacket.state = MCP_STATE_{self.state.upper()};",
+            f"{indent}this->mcpacket.direction = MCP_DIRECTION_{self.direction.upper()};",
+            f"{indent}this->mcpacket.id = {self.packet_id};",
+            f"{indent}/* this->mcpacket.length = uninitialized; */",
+            f"{indent}this->mcpacket.name = \"{self.class_name}\";", # todo create immutable mcpackets and assign pointers?
+            fields,
             "}"
         ]
 
@@ -1039,7 +1126,7 @@ warning_header = (
     " * @author SpockBotMC",
     " * @author andersonarc (e.andersonarc@gmail.com)",
     " * @brief generated by mcd2packet protocol specification",
-    " * @version 0.3",
+    " * @version 0.4",
     " * @date 2020-12-12",
     " */"
 )
@@ -1050,7 +1137,7 @@ warning_impl = (
     " * @author SpockBotMC",
     " * @author andersonarc (e.andersonarc@gmail.com)",
     " * @brief generated by mcd2packet protocol specification",
-    " * @version 0.3",
+    " * @version 0.4",
     " * @date 2020-12-12",
     " */"
 )
@@ -1076,7 +1163,7 @@ def to_enum(name, direction, state):
     d = "SB" if direction == "toServer" else "CB"
     st = {"handshaking": "HS", "status": "ST", "login": "LG",
           "play": "PL"}[state]
-    return f"{d}_{st}_{name}"
+    return f"MCP_{d}_{st}_{name}"
 
 
 def to_camel_case(string):
@@ -1098,7 +1185,6 @@ def run(version):
     proto = mcd.protocol
     header_upper = [
         *warning_header,
-        f"/* MCD version {version.replace('_', '.')} */",
         "#ifndef PROTOCOL_H",
         "#define PROTOCOL_H",
         "",
@@ -1106,51 +1192,52 @@ def run(version):
         "#include <malloc.h>",
         "#include <string.h>",
         "#include <unistd.h>",
+        "#include \"mcp/handler.h\"",
         "#include \"mcp/particles.h\"",
         "#include \"mcp/misc.h\"",
         "#include \"mcp/types.h\"",
         "#include \"mcp/nbt.h\"",
         "",
+        f"#define MC_VERSION \"{version.replace('_', '.')}\"",
         f"#define MC_PROTOCOL_VERSION {mcd.version['version']}",
         "",
-        "typedef enum packet_direction {",
-        "  SERVERBOUND,",
-        "  CLIENTBOUND,",
-        "  DIRECTION_MAX",
-        "} packet_direction;",
+        "typedef enum mcpacket_direction {",
+        "  MCP_DIRECTION_SERVERBOUND,",
+        "  MCP_DIRECTION_CLIENTBOUND,",
+        "  MCP_DIRECTION_MAX",
+        "} mcpacket_direction;",
         "",
-        "typedef enum packet_state {",
-        "  HANDSHAKING,",
-        "  STATUS,",
-        "  LOGIN,",
-        "  PLAY,",
-        "  STATE_MAX",
-        "} packet_state;",
+        "typedef enum mcpacket_state {",
+        "  MCP_STATE_HANDSHAKING,",
+        "  MCP_STATE_STATUS,",
+        "  MCP_STATE_LOGIN,",
+        "  MCP_STATE_PLAY,",
+        "  MCP_STATE_MAX",
+        "} mcpacket_state;",
         "",
-        "#define PACKET                       \\",
-        "  packet_state packet_state;         \\",
-        "  packet_direction packet_direction; \\",
-        "  int32_t packet_id;                 \\",
-        "const string_t packet_name; ",
-        "",
-        "typedef struct Packet {",
-        "  PACKET",
-        "} Packet;"
+        "typedef struct mcpacket_t {",
+        "  mcpacket_state state;",
+        "  mcpacket_direction direction;",
+        "  size_t length;",
+        "  int id;",
+        "  const string_t name; ",
+        "} mcpacket_t;",
+        ""
             ]
     header_lower = [
         "extern const char* serverbound_handshaking_cstrings["
-        "SERVERBOUND_HANDSHAKING_MAX];",
-        "extern const char* clientbound_status_cstrings[CLIENTBOUND_STATUS_MAX];",
-        "extern const char* serverbound_status_cstrings[SERVERBOUND_STATUS_MAX];",
-        "extern const char* clientbound_login_cstrings[CLIENTBOUND_LOGIN_MAX];",
-        "extern const char* serverbound_login_cstrings[SERVERBOUND_LOGIN_MAX];",
-        "extern const char* clientbound_play_cstrings[CLIENTBOUND_PLAY_MAX];",
-        "extern const char* serverbound_play_cstrings[SERVERBOUND_PLAY_MAX];",
+        "MCP_SERVERBOUND_HANDSHAKING_MAX];",
+        "extern const char* clientbound_status_cstrings[MCP_CLIENTBOUND_STATUS_MAX];",
+        "extern const char* serverbound_status_cstrings[MCP_SERVERBOUND_STATUS_MAX];",
+        "extern const char* clientbound_login_cstrings[MCP_CLIENTBOUND_LOGIN_MAX];",
+        "extern const char* serverbound_login_cstrings[MCP_SERVERBOUND_LOGIN_MAX];",
+        "extern const char* clientbound_play_cstrings[MCP_CLIENTBOUND_PLAY_MAX];",
+        "extern const char* serverbound_play_cstrings[MCP_SERVERBOUND_PLAY_MAX];",
         "",
-        "extern const char **protocol_cstrings[STATE_MAX][DIRECTION_MAX];",
-        "extern const int protocol_max_ids[STATE_MAX][DIRECTION_MAX];",
+        "extern const char **protocol_cstrings[MCP_STATE_MAX][MCP_DIRECTION_MAX];",
+        "extern const int protocol_max_ids[MCP_STATE_MAX][MCP_DIRECTION_MAX];",
         "",
-        "Packet* make_packet(packet_state state, packet_direction dir, int packet_id);",
+        "mcpacket_t* mcpacket_parse(mcpacket_state state, mcpacket_direction direction, int mcpacket_id);",
         ""
     ]
     impl_upper = [
@@ -1196,29 +1283,35 @@ def run(version):
 
                 impl_lower += pak.encoder()
                 impl_lower += pak.decoder()
+                impl_lower += pak.constructor()
                 impl_lower.append('')
-
-    for state in mc_states:
+#todo not only typedef in methods, also define struct
+    for state in mc_states: 
         for direction in mc_directions:
             dr = "clientbound" if direction == "toClient" else "serverbound"
-            packet_enum[state][direction].append(f"{dr.upper()}_{state.upper()}_MAX")
-            header_upper.append(f"enum {dr}_{state}_ids {{")
+            packet_enum[state][direction].append(f"MCP_{dr.upper()}_{state.upper()}_MAX")
+            header_upper.append(f"enum mcp_{dr}_{state}_ids {{")
             header_upper.extend(f"{indent}{l}," for l in packet_enum[state][direction])
             header_upper[-1] = header_upper[-1][:-1]
             header_upper.extend(("};", ""))
+            header_upper.append(f"mcp_packet_handler_t* mcp_{dr}_{state}_handlers[MCP_{dr.upper()}_{state.upper()}_MAX] = {{")
+            if len(packet_enum[state][direction]) > 1:
+                header_upper.extend([f"{indent}&mcp_blank_handler,"] * (len(packet_enum[state][direction]) - 1))
+                header_upper[-1] = header_upper[-1][:-1]
+            header_upper.extend(("};", ""))
 
     make_packet = [
-        "Packet* make_packet(packet_state state, packet_direction dir, int packet_id) {",
+        "mcpacket_t* mcpacket_parse(mcpacket_state state, mcpacket_direction direction, int mcpacket_id) {",
         "  /*switch(state) {"
     ]
 
     for state in mc_states:
         make_packet.append(f"{indent * 2}case {state.upper()}:")
-        make_packet.append(f"{indent * 3}switch(dir) {{")
+        make_packet.append(f"{indent * 3}switch (direction) {{")
         for direction in mc_directions:
             dr = "CLIENTBOUND" if direction == "toClient" else "SERVERBOUND"
             make_packet.append(f"{indent * 4}case {dr}:")
-            make_packet.append(f"{indent * 5}switch(packet_id) {{")
+            make_packet.append(f"{indent * 5}switch (packet_id) {{")
             for pak in packets[state][direction]:
                 make_packet.append(f"{indent * 6} case {pak.packet_id}:")
                 make_packet.append(f"{indent * 7} return "
@@ -1240,25 +1333,25 @@ def run(version):
         for direction in mc_directions:
             if packets[state][direction]:
                 dr = "clientbound" if direction == "toClient" else "serverbound"
-                impl_upper.append(f"const char* {dr}_{state}_cstrings[] = {{")
+                impl_upper.append(f"const char* mcp_{dr}_{state}_cstrings[] = {{")
                 for pak in packets[state][direction]:
                     impl_upper.append(f"{indent}\"{pak.class_name}\",")
                 impl_upper[-1] = impl_upper[-1][:-1]
                 impl_upper.extend(("};", ""))
 
     impl_upper += [
-        "const char **protocol_cstrings[STATE_MAX][DIRECTION_MAX] = {",
-        f"{indent}{{serverbound_handshaking_cstrings}},",
-        f"{indent}{{serverbound_status_cstrings, clientbound_status_cstrings}},",
-        f"{indent}{{serverbound_login_cstrings, clientbound_login_cstrings}},",
-        f"{indent}{{serverbound_play_cstrings, clientbound_play_cstrings}}",
+        "const char** mcp_protocol_cstrings[MCP_STATE_MAX][MCP_DIRECTION_MAX] = {",
+        f"{indent}{{mcp_serverbound_handshaking_cstrings}},",
+        f"{indent}{{mcp_serverbound_status_cstrings, mcp_clientbound_status_cstrings}},",
+        f"{indent}{{mcp_serverbound_login_cstrings, mcp_clientbound_login_cstrings}},",
+        f"{indent}{{mcp_serverbound_play_cstrings, mcp_clientbound_play_cstrings}}",
         "};",
         "",
-        "const int protocol_max_ids[STATE_MAX][DIRECTION_MAX] = {",
-        f"{indent}{{SERVERBOUND_HANDSHAKING_MAX, CLIENTBOUND_HANDSHAKING_MAX}},",
-        f"{indent}{{SERVERBOUND_STATUS_MAX, CLIENTBOUND_STATUS_MAX}},",
-        f"{indent}{{SERVERBOUND_LOGIN_MAX, CLIENTBOUND_LOGIN_MAX}},",
-        f"{indent}{{SERVERBOUND_PLAY_MAX, CLIENTBOUND_PLAY_MAX}}",
+        "const int mcp_protocol_max_ids[MCP_STATE_MAX][MCP_DIRECTION_MAX] = {",
+        f"{indent}{{MCP_SERVERBOUND_HANDSHAKING_MAX, MCP_CLIENTBOUND_HANDSHAKING_MAX}},",
+        f"{indent}{{MCP_SERVERBOUND_STATUS_MAX, MCP_CLIENTBOUND_STATUS_MAX}},",
+        f"{indent}{{MCP_SERVERBOUND_LOGIN_MAX, MCP_CLIENTBOUND_LOGIN_MAX}},",
+        f"{indent}{{MCP_SERVERBOUND_PLAY_MAX, MCP_CLIENTBOUND_PLAY_MAX}}",
         "};",
         "",
     ]

@@ -2,6 +2,7 @@
  * @file nbt.h
  * @author andersonarc (e.andersonarc@gmail.com)
  * @brief minecraft nbt tag parsing
+ * @todo this file is a stub
  * @version 0.2
  * @date 2020-12-16
  */
@@ -10,18 +11,16 @@
 #define MCP_NBT_H
 
     /* includes */
-#include "mcp/misc.h" /* stream_t */
+#include "mcp/stream.h" /* stream io */
 
     /* defines */
 /**
- * todo
  * @brief stub nbt tag
  */
 #define nbt_tag_compound void*
 
     /* typedefs */
 /**
- * todo
  * @brief stub nbt enum
  */
 typedef enum nbt_tag_type {
@@ -42,8 +41,7 @@ typedef enum nbt_tag_type {
 
     /* functions */
 /**
- * todo
- * @brief nbt stubs 
+ * @brief nbt stub functions
  */
 void nbt_encode_full(stream_t dest, nbt_tag_compound* this);
 void nbt_decode_full(stream_t src, nbt_tag_compound* this);

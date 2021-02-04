@@ -23,7 +23,7 @@ protocol = custom_target('protocol',
     command: [python, '@INPUT@'])
 
 # prepare build files
-src = files('src/types.c', 'src/misc.c', 'src/nbt.c')
+src = files('src/types.c', 'src/misc.c', 'src/nbt.c', 'src/handler.c')
 include = include_directories('include')
 
 # compile library

@@ -3,7 +3,7 @@
  * @author SpockBotMC
  * @author andersonarc (e.andersonarc@gmail.com)
  * @brief data structures and encoders/decoders for minecraft data types
- * @version 0.4
+ * @version 0.5
  * @date 2020-12-13
  */
       /* header guard */
@@ -12,28 +12,22 @@
 
       /* includes */
 #include <stdint.h> /* integer types */
-#include <string.h> /* string operations */ 
-#include <endian.h> /* byte swap */ 
-#include <malloc.h> /* memory allocation */ 
-#include <unistd.h> /* socket io */
 
 #include "mcp/particles.h"  /* particle types */
-#include "mcp/misc.h"       /* misc */
+#include "mcp/misc.h"       /* miscellanous */
 #include "mcp/nbt.h"        /* nbt data */
+#include <mcp/stream.h>     /* stream io */
 
-      /* generic typedefs */
-/**
- * @brief create predefined types for later use
- */
+      /* generic type definitions */
 vector_typedef(char)
 vector_typedef(int32_t)
 optional_typedef(nbt_tag_compound)
 optional_typedef(string_t)
 optional_typedef(int32_t)
 
-      /* minecraft data types, encoders and decoders */
+      /* minecraft data type definitions, encoders and decoders */
 /**
- * @brief minecraft UUID
+ * @brief minecraft uuid
  */
 typedef struct mc_uuid {
   uint64_t msb;
@@ -41,7 +35,7 @@ typedef struct mc_uuid {
 } mc_uuid;
 optional_typedef(mc_uuid)
 void enc_uuid(stream_t dest, mc_uuid src);
-mc_uuid dec_uuid(stream_t src);
+mc_uuid dec_uuid(stream_t src); 
 
 /**
  * @brief minecraft position
@@ -203,6 +197,22 @@ void enc_lef64(stream_t dest, double src);
 double dec_lef64(stream_t src);
 
 /**
+ * @brief string
+ * 
+ * @warning strings are encoded length-prefixed and without null terminator, 
+ *            but decoder returns regular null-terminated string
+ */
+void enc_string(stream_t dest, const char* src);
+char* dec_string(stream_t src);
+
+/**
+ * @brief buffer
+ */
+void enc_buffer(stream_t dest, char_vector_t src);
+char_vector_t dec_buffer(stream_t src, size_t len);
+
+      /* variable sized integer parser, encoder and decoder */
+/**
  * @brief varnum error enumeration
  */
 typedef enum varnum_fail {
@@ -218,28 +228,17 @@ int verify_varint(const char *buf, size_t max_len);
 int verify_varlong(const char *buf, size_t max_len);
 
 /**
- * @brief get varnum size
+ * @brief calculate varnum size for fixed integer
  */
 size_t size_varint(uint32_t varint);
 size_t size_varlong(uint64_t varlong);
 
 /**
- * @brief variable size integer
+ * @brief variable sized integer encoder and decoder
  */
 void enc_varint(stream_t dest, uint64_t src);
 int64_t dec_varint(stream_t src);
 
-/**
- * @brief string
- */
-void enc_string(stream_t dest, const char* src);
-char* dec_string(stream_t src);
-
-/**
- * @brief buffer
- */
-
-void enc_buffer(stream_t dest, char_vector_t src);
-char_vector_t dec_buffer(stream_t src, size_t len);
-
 #endif /* MCP_TYPES_H */
+
+/* todo create preallocated array with mcpacket_t and use pointers to them in actual packets */
