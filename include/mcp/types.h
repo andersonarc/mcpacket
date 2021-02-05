@@ -241,5 +241,3 @@ void enc_varint(stream_t dest, uint64_t src);
 int64_t dec_varint(stream_t src);
 
 #endif /* MCP_TYPES_H */
-
-/* todo create preallocated array with mcpacket_t and use pointers to them in actual packets */

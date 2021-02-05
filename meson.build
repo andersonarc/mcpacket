@@ -28,7 +28,8 @@ include = include_directories('include')
 
 # compile library
 libmcpacket = library('mcpacket', [src, protocol],
-    include_directories: include)
+    include_directories: include,
+    c_args: ['-Wno-unused-variable', '-Wno-switch'])
 
 # create a dependency
 libmcpacket_dep = declare_dependency(

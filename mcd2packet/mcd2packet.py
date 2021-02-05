@@ -29,6 +29,8 @@ type_pre_definitions = dict(
     mc_position_optional_t=""
 )
 type_definitions = type_pre_definitions.copy()
+packet_length_variable = "_this_packet_length"
+packet_read_length_variable = "_this_packet_read_length"
 
 
 def mc_data_name(typename):
@@ -68,14 +70,14 @@ def extract_type(type_field):
 # Param: MCD "field"
 # Returns: Field name, Field type, Field data
 def extract_field(packet_field):
-    name = packet_field.get('name', '')
-    field_type, field_data = extract_type(packet_field['type'])
+    name = packet_field.get("name", "")
+    field_type, field_data = extract_type(packet_field["type"])
     return name, field_type, field_data
 
 
 class generic_type:
-    typename = ''
-    postfix = ''
+    typename = ""
+    postfix = ""
 
     def __init__(self, name, parent, type_data=None, use_compare=False):
         self.name = name
@@ -136,7 +138,7 @@ class generic_type:
     def __eq__(self, val):
         if not isinstance(val, type(self)):
             return False
-        if hasattr(self, 'typename') and hasattr(val, 'typename'):
+        if hasattr(self, "typename") and hasattr(val, "typename"):
             if self.typename != val.typename:
                 return False
         if self.use_compare:
@@ -159,9 +161,9 @@ class numeric_type(simple_type):
 
 
 # These exist because MCD switches use them. I hate MCD switches
-@mc_data_name('void')
+@mc_data_name("void")
 class void_type(numeric_type):
-    typename = 'void'
+    typename = "void"
 
     def declaration(self):
         return f"/* '{self.name}' is a void type */",
@@ -173,128 +175,128 @@ class void_type(numeric_type):
         return f"/* '{self.name}' is a void type */",
 
 
-@mc_data_name('u8')
+@mc_data_name("u8")
 class num_u8(numeric_type):
     size = 1
-    typename = 'uint8_t'
-    postfix = 'byte'
+    typename = "uint8_t"
+    postfix = "byte"
 
 
-@mc_data_name('i8')
+@mc_data_name("i8")
 class num_i8(num_u8):
-    typename = 'int8_t'
+    typename = "int8_t"
 
 
-@mc_data_name('bool')
+@mc_data_name("bool")
 class num_bool(num_u8):
     pass
 
 
-@mc_data_name('u16')
+@mc_data_name("u16")
 class num_u16(numeric_type):
     size = 2
-    typename = 'uint16_t'
-    postfix = 'be16'
+    typename = "uint16_t"
+    postfix = "be16"
 
 
-@mc_data_name('i16')
+@mc_data_name("i16")
 class num_i16(num_u16):
-    typename = 'int16_t'
+    typename = "int16_t"
 
 
-@mc_data_name('u32')
+@mc_data_name("u32")
 class num_u32(numeric_type):
     size = 4
-    typename = 'uint32_t'
-    postfix = 'be32'
+    typename = "uint32_t"
+    postfix = "be32"
 
 
-@mc_data_name('i32')
+@mc_data_name("i32")
 class num_i32(num_u32):
-    typename = 'int32_t'
+    typename = "int32_t"
 
 
-@mc_data_name('u64')
+@mc_data_name("u64")
 class num_u64(numeric_type):
     size = 8
-    typename = 'uint64_t'
-    postfix = 'be64'
+    typename = "uint64_t"
+    postfix = "be64"
 
 
-@mc_data_name('i64')
+@mc_data_name("i64")
 class num_i64(num_u64):
-    typename = 'int64_t'
+    typename = "int64_t"
 
 
-@mc_data_name('f32')
+@mc_data_name("f32")
 class num_float(num_u32):
-    typename = 'float'
-    postfix = 'bef32'
+    typename = "float"
+    postfix = "bef32"
 
 
-@mc_data_name('f64')
+@mc_data_name("f64")
 class num_double(num_u64):
-    typename = 'double'
-    postfix = 'bef64'
+    typename = "double"
+    postfix = "bef64"
 
 
 # Positions and UUIDs are broadly similar to numeric types
 # A position is technically a bitfield but we hide that behind a utility func
-@mc_data_name('position')
+@mc_data_name("position")
 class num_position(num_u64):
-    typename = 'mc_position'
-    postfix = 'position'
+    typename = "mc_position"
+    postfix = "position"
 
 
-@mc_data_name('UUID')
+@mc_data_name("UUID")
 class num_uuid(numeric_type):
     size = 16
-    typename = 'mc_uuid'
-    postfix = 'uuid'
+    typename = "mc_uuid"
+    postfix = "uuid"
 
 
-@mc_data_name('varint')
+@mc_data_name("varint")
 class mc_varint(numeric_type):
-    # typename = 'std::int32_t'
+    # typename = "std::int32_t"
     # All varints are varlongs until this gets fixed
     # https://github.com/PrismarineJS/minecraft-data/issues/119
-    typename = 'int64_t'
-    postfix = 'varint'
+    typename = "int64_t"
+    postfix = "varint"
 
     def length(self):
         return f"size_varint({self.name})"
 
 
-@mc_data_name('varlong')
+@mc_data_name("varlong")
 class mc_varlong(numeric_type):
-    typename = 'int64_t'
+    typename = "int64_t"
     # Decoding varlongs is the same as decoding varints
-    postfix = 'varint'
+    postfix = "varint"
 
     def length(self):
         return f"size_varlong({self.name})"
 
 
-@mc_data_name('string')
+@mc_data_name("string")
 class mc_string(simple_type):
-    typename = 'string_t'
-    postfix = 'string'
+    typename = "string_t"
+    postfix = "string"
 
     def length(self):
         return f"size_string({self.name})"
 
 
-@mc_data_name('buffer')
+@mc_data_name("buffer")
 class mc_buffer(simple_type):
-    typename = 'char_vector_t'
-    postfix = 'buffer'
+    typename = "char_vector_t"
+    postfix = "buffer"
 
     def __init__(self, name, parent, type_data, use_compare=False):
         super().__init__(name, parent, type_data, use_compare)
-        self.count = mcd_type_map[type_data['countType']]
+        self.count = mcd_type_map[type_data["countType"]]
 
     def length(self):
-        return f"({self.count(self.name + '.size', self).length()} + sizeof(*{self.name}.data) * {self.name}.size)"
+        return f"({self.count(f'{self.name}.size', self).length()} + sizeof(*{self.name}.data) * {self.name}.size)"
 
     def encoder(self):
         return (
@@ -306,10 +308,10 @@ class mc_buffer(simple_type):
         return f"{self.name} = dec_buffer(src, dec_{self.count.postfix}(src));",
 
 
-@mc_data_name('restBuffer')
+@mc_data_name("restBuffer")
 class mc_rest_buffer(simple_type):
-    typename = 'char_vector_t'
-    postfix = 'buffer'
+    typename = "char_vector_t"
+    postfix = "buffer"
 
     def length(self):
         return f"(sizeof(*{self.name}.data) * {self.name}.size)"
@@ -317,18 +319,16 @@ class mc_rest_buffer(simple_type):
     def encoder(self):
         return f"stream_write(dest, {self.name}.data, {self.name}.size);",
 
-    #todo use packet length value minus already read?
     def decoder(self):
-        return f"{self.name}.size = 0;",
-        # return (
-        #  f"{self.name} = std::vector<char>(std::istreambuf_iterator<char>(src),",
-        #    indent * 2 + f"std::istreambuf_iterator<char>());"
-        # )
+        return (
+            f"{self.name}.size = {packet_length_variable} - {packet_read_length_variable};",
+            f"stream_read(src, {self.name}.data, {self.name}.size)",
+        )
 
 
-@mc_data_name('nbt')
+@mc_data_name("nbt")
 class mc_nbt(simple_type):
-    typename = 'nbt_tag_compound'
+    typename = "nbt_tag_compound"
 
     def length(self):
         return f"0 /* todo nbt length */"
@@ -340,9 +340,9 @@ class mc_nbt(simple_type):
         return f"nbt_decode_full(src, {self.name});",
 
 
-@mc_data_name('optionalNbt')
+@mc_data_name("optionalNbt")
 class mc_optional_nbt(simple_type):
-    typename = 'nbt_tag_compound_optional_t'
+    typename = "nbt_tag_compound_optional_t"
 
     def length(self):
         return f"0 /* todo nbt length */"
@@ -373,43 +373,43 @@ class self_serializing_type(simple_type):
         return f"{self.typename}_decode(src, &{self.name});",
 
 
-@mc_data_name('slot')
+@mc_data_name("slot")
 class mc_slot(self_serializing_type):
-    typename = 'mc_slot'
+    typename = "mc_slot"
 
 
-@mc_data_name('minecraft_smelting_format')
+@mc_data_name("minecraft_smelting_format")
 class mc_smelting(self_serializing_type):
-    typename = 'mc_smelting'
+    typename = "mc_smelting"
 
 
-@mc_data_name('entityMetadata')
+@mc_data_name("entityMetadata")
 class mc_metadata(self_serializing_type):
-    typename = 'mc_entity_metadata'
+    typename = "mc_entity_metadata"
 
 
 # This is not how topBitSetTerminatedArray works, but the real solution is hard
 # and this solution is easy. As long as this type is only found in the Entity
 # Equipment packet we're going to stick with this solution
-@mc_data_name('topBitSetTerminatedArray')
+@mc_data_name("topBitSetTerminatedArray")
 class mc_entity_equipment(self_serializing_type):
-    typename = 'mc_entity_equipment'
+    typename = "mc_entity_equipment"
 
 
-@mc_data_name('particleData')
+@mc_data_name("particleData")
 class mc_particle(self_serializing_type):
-    typename = 'mc_particle'
+    typename = "mc_particle"
 
     def __init__(self, name, parent, type_data, use_compare=False):
         super().__init__(name, parent, type_data, use_compare)
-        self.id_field = type_data['compareTo']
+        self.id_field = type_data["compareTo"]
 
     def decoder(self):
         return f"{self.typename}_decode(src, &{self.name}, (mc_particle_type) this->{self.id_field});",
 
 
 class vector_type(simple_type):
-    element = ''
+    element = ""
     count = mc_varint
 
     def __init__(self, name, parent, type_data, use_compare=False):
@@ -421,7 +421,7 @@ class vector_type(simple_type):
             p = p.parent
 
     def length(self):
-        return f"({self.count(self.name + '.size', self).length()} + sizeof(*{self.name}.data) * {self.name}.size)"
+        return f"({self.count(f'{self.name}.size', self).length()} + sizeof(*{self.name}.data) * {self.name}.size)"
 
     def encoder(self):
         iterator = f"i{self.depth}"
@@ -443,19 +443,19 @@ class vector_type(simple_type):
         )
 
 
-@mc_data_name('ingredient')
+@mc_data_name("ingredient")
 class mc_ingredient(vector_type):
-    element = 'mc_slot'
-    typename = 'mc_slot_vector_t'
+    element = "mc_slot"
+    typename = "mc_slot_vector_t"
 
 
-@mc_data_name('tags')
+@mc_data_name("tags")
 class mc_tags(vector_type):
-    element = 'mc_tag'
-    typename = 'mc_tag_vector_t'
+    element = "mc_tag"
+    typename = "mc_tag_vector_t"
 
 
-@mc_data_name('option')
+@mc_data_name("option")
 class mc_option(simple_type):
     def __init__(self, name, parent, type_data, use_compare=False):
         super().__init__(name, parent, type_data, use_compare)
@@ -495,10 +495,11 @@ class mc_option(simple_type):
                                                                         mc_buffer, mc_rest_buffer):
             self.field.name = self.name
         # todo check origin
+        # /\ what does it mean? does it make sense?
         ret.append(f"{indent}{self.name}.has_value = true;")
         self.field.name = f"{self.name}.value"
         ret.extend(indent + line for line in self.field.decoder())
-        ret.append('}')
+        ret.append("}")
         return ret
 
 
@@ -512,7 +513,7 @@ class complex_type(generic_type):
             if result == 0:
                 return [f"{self.name}_gtype {self.name};"]
 
-            code = ''
+            code = ""
             if result == 2:
                 code = str(abs(hash(str(self.fields))))[:2]
             name = f"{self.name}_g{code}type"
@@ -562,7 +563,7 @@ def get_storage(numbits):
         return 64
 
 
-@mc_data_name('bitfield')
+@mc_data_name("bitfield")
 class mc_bitfield(complex_type):
     def __init__(self, name, parent, type_data, use_compare=False):
         super().__init__(name, parent, type_data, use_compare)
@@ -584,20 +585,20 @@ class mc_bitfield(complex_type):
 
         total = 0
         for idx, field in enumerate(type_data):
-            total += field['size']
-            if field['name'] in ('_unused', 'unused'):
+            total += field["size"]
+            if field["name"] in ("_unused", "unused"):
                 continue
-            self.field_sizes[field['name']] = field['size']
+            self.field_sizes[field["name"]] = field["size"]
             shift = 0
             for temp in type_data[idx + 1:]:
-                shift += temp['size']
-            self.extra_data.append(((1 << field['size']) - 1, shift, field['size'],
-                                    field['signed']))
-            numbits = get_storage(field['size'])
-            if field['signed']:
-                self.fields.append(lookup_signed[numbits](field['name'], self))
+                shift += temp["size"]
+            self.extra_data.append(((1 << field["size"]) - 1, shift, field["size"],
+                                    field["signed"]))
+            numbits = get_storage(field["size"])
+            if field["signed"]:
+                self.fields.append(lookup_signed[numbits](field["name"], self))
             else:
-                self.fields.append(lookup_unsigned[numbits](field['name'], self))
+                self.fields.append(lookup_unsigned[numbits](field["name"], self))
 
         self.storage = lookup_unsigned[total](f"{name}_", self)
         self.size = total // 8
@@ -632,15 +633,15 @@ class mc_bitfield(complex_type):
 
 
 # Whatever you think an MCD "switch" is you're probably wrong
-@mc_data_name('switch')
+@mc_data_name("switch")
 class mc_switch(simple_type):
     def __init__(self, name, parent, type_data, use_compare=False):
         super().__init__(name, parent, type_data, use_compare)
 
-        if not (hasattr(self.parent, 'name') and self.parent.name):
-            self.parent.name = 'this->'
+        if not (hasattr(self.parent, "name") and self.parent.name):
+            self.parent.name = "this->"
 
-        self.compareTo = type_data['compareTo']
+        self.compareTo = type_data["compareTo"]
         # Unions are a sum type that differs based on conditions. They are a true
         # "switch". All others are here because MCData is bad and I hate it.
         self.is_union = False
@@ -666,13 +667,13 @@ class mc_switch(simple_type):
 
         # Find out if all possible values are the same type, in which case we're
         # not a union. And if all the types are void we're an inverse.
-        values = type_data['fields'].values()
-        if all(map(lambda x: x == 'void', values)):
+        values = type_data["fields"].values()
+        if all(map(lambda x: x == "void", values)):
             self.is_inverse = True
-            f_type, f_data = extract_type(type_data['default'])
+            f_type, f_data = extract_type(type_data["default"])
             self.fields.append(mcd_type_map[f_type](name, self, f_data))
         else:
-            values = list(filter(lambda x: x != 'void', values))
+            values = list(filter(lambda x: x != "void", values))
             self.is_union = not all(x == values[0] for x in values)
 
         # In the case we're not a union, we need to check for sister switches
@@ -681,11 +682,11 @@ class mc_switch(simple_type):
                 if isinstance(field, mc_switch) and field.compareTo == self.compareTo:
                     self.null_switch = True
                     self.lead_sister = field.lead_sister if field.null_switch else field
-                    self.lead_sister.merge(name, type_data['fields'], self.is_inverse,
-                                           type_data.get('default', None))
+                    self.lead_sister.merge(name, type_data["fields"], self.is_inverse,
+                                           type_data.get("default", None))
                     return
 
-        self.process_fields(self.name, type_data['fields'])
+        self.process_fields(self.name, type_data["fields"])
 
     def declaration(self):
         if self.null_switch:
@@ -693,7 +694,7 @@ class mc_switch(simple_type):
         return [l for f in self.fields for l in f.declaration()]
 
     def length(self):
-        has_name = hasattr(self.parent, 'name') and self.parent.name
+        has_name = hasattr(self.parent, "name") and self.parent.name
         if has_name and self.parent.name.endswith("->"):
             suffix = ""
         else:
@@ -710,7 +711,7 @@ class mc_switch(simple_type):
         return f"({ret[:-2]})"
 
     def code_fields(self, ret, fields, encode=True):
-        has_name = hasattr(self.parent, 'name') and self.parent.name
+        has_name = hasattr(self.parent, "name") and self.parent.name
         if has_name and self.parent.name.endswith("->"):
             suffix = ""
         else:
@@ -731,7 +732,7 @@ class mc_switch(simple_type):
             case, _ = next(iter(self.field_dict.items()))
             ret = [f"if ({comp} != {case}) {{"]
         else:
-            return '// Multi-Condition Inverse Not Yet Implemented',
+            return "// Multi-Condition Inverse Not Yet Implemented",
         self.code_fields(ret, self.fields, encode)
         ret.append("}")
         return ret
@@ -782,9 +783,9 @@ class mc_switch(simple_type):
     # ".." and move up the container hierarchy using that. If we hit the packet,
     # we abandon ship and assume the path is absolute.
     def get_compare(self):
-        comp = self.compareTo.replace('../', '').replace('..', '').replace('/', '.')
+        comp = self.compareTo.replace("../", "").replace("..", "").replace("/", ".")
         p = self.parent
-        for i in range(self.compareTo.count('..')):
+        for i in range(self.compareTo.count("..")):
             while not (isinstance(p, complex_type) or isinstance(p, packet)):
                 p = p.parent
             if isinstance(p, packet):
@@ -850,7 +851,7 @@ class mc_switch(simple_type):
                     # only one dupe for each key? I think so?
                     same = next(x for x in fields if x in has_dupes)
                     if self.is_str_switch:
-                        tmp = key.replace('"', '').replace(':', '_')
+                        tmp = key.replace('"', "").replace(":", "_")
                         same.name = tmp
                         # As a weird consequence of the merging strategy, we can end up in
                         # a situation with two tags that compare the same but have
@@ -880,12 +881,12 @@ class mc_switch(simple_type):
 
 # Arrays come in three flavors. Fixed length, length prefixed, and foreign
 # field
-@mc_data_name('array')
+@mc_data_name("array")
 class mc_array(simple_type):
     def __init__(self, name, parent, type_data, use_compare=False):
         super().__init__(name, parent, type_data, use_compare)
-        f_type, f_data = extract_type(type_data['type'])
-        self.field = mcd_type_map[f_type]('', self, f_data)
+        f_type, f_data = extract_type(type_data["type"])
+        self.field = mcd_type_map[f_type]("", self, f_data)
         self.depth = 0
         p = parent
         while not isinstance(p, packet):
@@ -899,13 +900,13 @@ class mc_array(simple_type):
         self.count = None
         if "countType" in type_data:
             self.is_prefixed = True
-            self.count = mcd_type_map[type_data['countType']]('', self, [])
-        elif isinstance(type_data['count'], int):
+            self.count = mcd_type_map[type_data["countType"]]("", self, [])
+        elif isinstance(type_data["count"], int):
             self.is_fixed = True
-            self.count = type_data['count']
+            self.count = type_data["count"]
         else:
             self.is_foreign = True
-            self.count = type_data['count']
+            self.count = type_data["count"]
 
         if isinstance(self.field, simple_type):
             self.f_type = self.field.typename
@@ -964,7 +965,7 @@ class mc_array(simple_type):
 
     def prefixed_decode(self):
         iterator = f"i{self.depth}"
-        self.count.name = ''
+        self.count.name = ""
         self.field.name = f"{self.name}.data[{iterator}]"
         return [
             f"{self.name}.size = {self.count.decoder()};",
@@ -976,9 +977,9 @@ class mc_array(simple_type):
 
     # Identical to switches' compareTo
     def get_foreign(self):
-        comp = self.count.replace('../', '').replace('..', '').replace('/', '.')
+        comp = self.count.replace("../", "").replace("..", "").replace("/", ".")
         p = self.parent
-        for i in range(self.count.count('..')):
+        for i in range(self.count.count("..")):
             while not (isinstance(p, complex_type) or isinstance(p, packet)):
                 p = p.parent
             if isinstance(p, packet):
@@ -1029,7 +1030,7 @@ class mc_array(simple_type):
 # Not a container_type because containers_types sometimes have trivial storage
 # requirements. Actual containers always have non-trivial storage, which makes
 # them a pure complex type
-@mc_data_name('container')
+@mc_data_name("container")
 class mc_container(complex_type):
     def __init__(self, name, parent, type_data, use_compare=False):
         super().__init__(name, parent, type_data, use_compare)
@@ -1077,9 +1078,9 @@ class mc_container(complex_type):
         return all([i == j for i, j in zip(self.fields, value.fields)])
 
 
-def get_decoder(field):
+def get_decoder_and_length(field):
     field.temp_name("this->" + field.name)
-    string = field.decoder()
+    string = tuple(list(field.decoder()) + [f"{packet_read_length_variable} += {field.length()};"])
     field.reset_name()
     return string
 
@@ -1114,8 +1115,8 @@ class packet:
         return "(" + reduce(lambda a, b: f"{a} + {b}", list(get_length(f) for f in self.fields), "0") + ")"
 
     def declaration(self): 
-        declaration = ''
-        constructor = ''
+        declaration = ""
+        constructor = ""
         for field in self.fields:
             for line in field.declaration():
                 declaration += f"{indent}{line}\n"
@@ -1123,7 +1124,7 @@ class packet:
         declaration = declaration[:-1]
         constructor = constructor.replace(";", ", ")[:-2]
         if len(constructor) > 0:
-            constructor = ', ' + constructor
+            constructor = ", " + constructor
 
         return [
             f"typedef struct {self.class_name} {{",
@@ -1138,8 +1139,8 @@ class packet:
     def encoder(self):
         return [
             f"void {self.class_name}_encode(stream_t dest, {self.class_name}* this) {{",
-            f"{indent}this->mcpacket.length = ({self.length()}) + size_varlong(this->mcpacket.id);",
-            f"{indent}enc_varint(dest, this->mcpacket.length);",
+            f"{indent}size_t {packet_length_variable} = (size_varlong(this->mcpacket.id) + {self.length()});",
+            f"{indent}enc_varint(dest, {packet_length_variable});",
             f"{indent}enc_varint(dest, this->mcpacket.id);",
             *(indent + l for f in self.fields for l in get_encoder(f)),
             "}"
@@ -1148,17 +1149,18 @@ class packet:
     def decoder(self):
         return [
             f"void {self.class_name}_decode(stream_t src, {self.class_name}* this) {{",
-            f"{indent}this->mcpacket.length = dec_varint(src);",
+            f"{indent}size_t {packet_length_variable} = dec_varint(src);",
+            f"{indent}size_t {packet_read_length_variable} = 0;",
             f"{indent}if (this->mcpacket.id != dec_varint(src)) {{",
             f"{indent}{indent}runtime_error(\"mcpacket: {self.class_name}_decode: incoming packet id differs with local\\n\");",
             f"{indent}}}",
-            *(indent + l for f in self.fields for l in get_decoder(f)),
+            *(indent + l for f in self.fields for l in get_decoder_and_length(f)),
             "}"
         ]
 
     def constructor(self):
-        fields = ''
-        constructor = ''
+        fields = ""
+        constructor = ""
         for field in self.fields:
             fields += f"{indent}this->{field.name} = {field.name};\n"
             for line in field.declaration():
@@ -1166,14 +1168,13 @@ class packet:
         fields = fields[:-1]
         constructor = constructor.replace(";", ", ")[:-2]
         if len(constructor) > 0:
-            constructor = ', ' + constructor
+            constructor = ", " + constructor
 
         return [
             f"void {self.class_name}_new({self.class_name}* this{constructor}) {{",
             f"{indent}this->mcpacket.state = MCP_STATE_{self.state.upper()};",
             f"{indent}this->mcpacket.direction = MCP_DIRECTION_{self.direction.upper()};",
             f"{indent}this->mcpacket.id = {self.packet_id};",
-            f"{indent}/* this->mcpacket.length = uninitialized; */",
             f"{indent}this->mcpacket.name = \"{self.class_name}\";", # todo create immutable mcpackets and assign pointers?
             fields,
             "}"
@@ -1216,13 +1217,13 @@ warning_particle = (
     " */"
 )
 
-first_cap_re = re.compile('(.)([A-Z][a-z]+)')
-all_cap_re = re.compile('([a-z0-9])([A-Z])')
+first_cap_re = re.compile("(.)([A-Z][a-z]+)")
+all_cap_re = re.compile("([a-z0-9])([A-Z])")
 
 
 def to_enum(name, direction, state):
-    s1 = first_cap_re.sub(r'\1_\2', name)
-    name = all_cap_re.sub(r'\1_\2', s1).upper()
+    s1 = first_cap_re.sub(r"\1_\2", name)
+    name = all_cap_re.sub(r"\1_\2", s1).upper()
     d = "SB" if direction == "toServer" else "CB"
     st = {"handshaking": "HS", "status": "ST", "login": "LG",
           "play": "PL"}[state]
@@ -1230,21 +1231,21 @@ def to_enum(name, direction, state):
 
 
 def to_camel_case(string):
-    return string.title().replace('_', '')
+    return string.title().replace("_", "")
 
 
 def extract_infos_from_listing(listing):
     ret = []
     # Why this seemingly random position inside the full listing? Because mcdata
     # hates you.
-    for p_id, p_name in listing['types']['packet'][1][0]['type'][1]['mappings'].items():
+    for p_id, p_name in listing["types"]["packet"][1][0]["type"][1]["mappings"].items():
         ret.append((int(p_id, 0), to_camel_case(p_name), f"packet_{p_name}"))
     return ret
 
 
 def run(version):
     mcd = minecraft_data(version)
-    version = version.replace('.', '_')
+    version = version.replace(".", "_")
     proto = mcd.protocol
     header_upper = [
         *warning_header,
@@ -1281,7 +1282,6 @@ def run(version):
         "typedef struct mcpacket_t {",
         "  mcpacket_state state;",
         "  mcpacket_direction direction;",
-        "  size_t length;",
         "  int id;",
         "  const string_t name; ",
         "} mcpacket_t;",
@@ -1324,7 +1324,7 @@ def run(version):
             packets[state][direction] = []
             packet_info_list = extract_infos_from_listing(proto[state][direction])
             for info in packet_info_list:
-                packet_data = proto[state][direction]['types'][info[2]][1]
+                packet_data = proto[state][direction]["types"][info[2]][1]
                 if info[1] != "LegacyServerListPing":
                     packet_id = to_enum(info[1], direction, state)
                     packet_enum[state][direction].append(packet_id)
@@ -1334,12 +1334,12 @@ def run(version):
                 if info[1] != "LegacyServerListPing": #todo LegacyServerListPing is not supported
                     packets[state][direction].append(pak)
                 header_lower += pak.declaration()
-                header_lower.append('')
+                header_lower.append("")
 
                 impl_lower += pak.encoder()
                 impl_lower += pak.decoder()
                 impl_lower += pak.constructor()
-                impl_lower.append('')
+                impl_lower.append("")
 
     for state in mc_states: 
         for direction in mc_directions:
@@ -1425,23 +1425,25 @@ def run(version):
 
     for type_definition in type_definitions:
         header_upper.extend(type_definitions[type_definition])
-        header_upper.append(' ')
+        header_upper.append(" ")
 
     header = header_upper + header_lower + ["#endif /* MCP_PROTOCOL_H */", ""]
     impl = impl_upper + impl_lower + make_packet + [""]
 
-    path = os.environ['MCP_PATH']
+    path = ""
+    if "MCP_PATH" in os.environ:
+        path = os.environ["MCP_PATH"] + "/"
 
-    if not os.path.exists(f"{path}/mcp"):
-        os.mkdir(f"{path}/mcp")
-
-    with open(f"{path}/mcp/particles.h", "w") as f:
-        f.write('\n'.join(particle_header))
-    with open(f"{path}/protocol.c", "w") as f:
-        f.write('\n'.join(impl))
-    with open(f"{path}/mcp/protocol.h", "w") as f:
-        f.write('\n'.join(header))
+    if not os.path.exists(f"{path}mcp"):
+        os.mkdir(f"{path}mcp")
+    #todo strange issue with generated types, sometimes they error. debug it
+    with open(f"{path}mcp/particles.h", "w") as f:
+        f.write("\n".join(particle_header))
+    with open(f"{path}protocol.c", "w") as f:
+        f.write("\n".join(impl))
+    with open(f"{path}mcp/protocol.h", "w") as f:
+        f.write("\n".join(header))
 
 
 if __name__ == "__main__":
-    run(os.environ['MCP_MC'])
+    run(os.environ["MCP_MC"])
