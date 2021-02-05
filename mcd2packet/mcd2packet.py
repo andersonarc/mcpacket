@@ -15,7 +15,6 @@ import os
 indent = "  "
 
 mcd_type_map = {}
-#todo empty packet constructors for decoders
 type_pre_definitions = dict(
     char_vector_t="",
     int32_t_vector_t="",
@@ -1131,9 +1130,11 @@ class packet:
             f"{indent}mcpacket_t mcpacket;",
             declaration,
             f"}} {self.class_name};",
-            f"void {self.class_name}_new({self.class_name}* this{constructor});",
+            f"void {self.class_name}_new({self.class_name}* this);",
+            f"void {self.class_name}_new_full({self.class_name}* this{constructor});",
             f"void {self.class_name}_encode(stream_t dest, {self.class_name}* this);", 
-            f"void {self.class_name}_decode(stream_t src, {self.class_name}* this);",
+            f"void {self.class_name}_decode(stream_t src, {self.class_name}* this, size_t {packet_length_variable});",
+            f"void {self.class_name}_decode_full(stream_t src, {self.class_name}* this);",
         ]
 
     def encoder(self):
@@ -1148,17 +1149,41 @@ class packet:
 
     def decoder(self):
         return [
-            f"void {self.class_name}_decode(stream_t src, {self.class_name}* this) {{",
-            f"{indent}size_t {packet_length_variable} = dec_varint(src);",
-            f"{indent}size_t {packet_read_length_variable} = 0;",
-            f"{indent}if (this->mcpacket.id != dec_varint(src)) {{",
-            f"{indent}{indent}runtime_error(\"mcpacket: {self.class_name}_decode: incoming packet id differs with local\\n\");",
-            f"{indent}}}",
+            f"void {self.class_name}_decode(stream_t src, {self.class_name}* this, size_t {packet_length_variable}) {{",
+            f"{indent}size_t {packet_read_length_variable} = size_varlong(this->mcpacket.id);",
             *(indent + l for f in self.fields for l in get_decoder_and_length(f)),
+            f"{indent}if ({packet_read_length_variable} != {packet_length_variable}) {{",
+            f"{indent*2}runtime_warning(\"mcpacket: {self.class_name}_decode: can't decode full packet\\n\");",
+            f"{indent*2}size_t left = {packet_length_variable} - {packet_read_length_variable};",
+            f"{indent*2}char* clean_buffer = malloc(sizeof(char) * left);",
+            f"{indent*2}stream_read(src, clean_buffer, left);", #todo stream stuff remove ; at end macro
+            f"{indent*2}free(clean_buffer);",
+            f"{indent}}}",
+            "}"
+        ]
+
+    def full_decoder(self):
+        return [
+            f"void {self.class_name}_decode_full(stream_t src, {self.class_name}* this) {{",
+            f"{indent}size_t {packet_length_variable} = dec_varint(src);",
+            f"{indent}if (this->mcpacket.id != dec_varint(src)) {{",
+            f"{indent*2}runtime_error(\"mcpacket: {self.class_name}_decode: incoming packet id differs with local\\n\");",
+            f"{indent}}}",
+            f"{indent}{self.class_name}_decode(src, this, {packet_length_variable});",
             "}"
         ]
 
     def constructor(self):
+        return [
+            f"void {self.class_name}_new({self.class_name}* this) {{",
+            f"{indent}this->mcpacket.state = MCP_STATE_{self.state.upper()};",
+            f"{indent}this->mcpacket.direction = MCP_DIRECTION_{self.direction.upper()};",
+            f"{indent}this->mcpacket.id = {self.packet_id};",
+            f"{indent}this->mcpacket.name = \"{self.class_name}\";",
+            "}"
+        ]
+
+    def full_constructor(self):
         fields = ""
         constructor = ""
         for field in self.fields:
@@ -1171,11 +1196,9 @@ class packet:
             constructor = ", " + constructor
 
         return [
-            f"void {self.class_name}_new({self.class_name}* this{constructor}) {{",
-            f"{indent}this->mcpacket.state = MCP_STATE_{self.state.upper()};",
-            f"{indent}this->mcpacket.direction = MCP_DIRECTION_{self.direction.upper()};",
-            f"{indent}this->mcpacket.id = {self.packet_id};",
-            f"{indent}this->mcpacket.name = \"{self.class_name}\";", # todo create immutable mcpackets and assign pointers?
+            f"void {self.class_name}_new_full({self.class_name}* this{constructor}) {{",
+            f"{indent}{self.class_name}_new(this);",
+            # todo create immutable mcpackets and assign pointers?
             fields,
             "}"
         ]
@@ -1338,7 +1361,9 @@ def run(version):
 
                 impl_lower += pak.encoder()
                 impl_lower += pak.decoder()
+                impl_lower += pak.full_decoder()
                 impl_lower += pak.constructor()
+                impl_lower += pak.full_constructor()
                 impl_lower.append("")
 
     for state in mc_states: 

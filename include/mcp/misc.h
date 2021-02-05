@@ -57,4 +57,11 @@ typedef struct type##_vector_t { \
  */
 void runtime_error(string_t message);
 
+/**
+ * @brief print warning
+ * 
+ * @param message message string
+ */
+void runtime_warning(string_t message);
+
 #endif /* MCP_MISC_H */
