@@ -28,6 +28,7 @@ type_pre_definitions = dict(
     mc_position_optional_t=""
 )
 type_definitions = type_pre_definitions.copy()
+length_functions = dict()
 packet_length_variable = "_this_packet_length"
 packet_read_length_variable = "_this_packet_read_length"
 
@@ -77,7 +78,7 @@ def extract_field(packet_field):
 class generic_type:
     typename = ""
     postfix = ""
-
+    
     def __init__(self, name, parent, type_data=None, use_compare=False):
         self.name = name
         self.old_name = None
@@ -95,11 +96,14 @@ class generic_type:
         self.compare_name = name
         self.use_compare = use_compare
 
-    def parameter(self):
-        return f"{self.typename} {self.name}",
+    def length(self, variable):
+        return f"{variable} += sizeof({self.name});",
 
-    def length(self):
-        return f"sizeof({self.name})"
+    def get_type(self):
+        return self.typename
+
+    def parameter(self):
+        return f"{self.typename} {self.name}"
 
     def declaration(self):
         return f"{self.typename} {self.name};",
@@ -163,6 +167,12 @@ class numeric_type(simple_type):
 @mc_data_name("void")
 class void_type(numeric_type):
     typename = "void"
+
+    def parameter(self):
+        return f"/* '{self.name}' is a void type */"
+
+    def length(self, variable):
+        return f"/* '{self.name}' is a void type */",
 
     def declaration(self):
         return f"/* '{self.name}' is a void type */",
@@ -261,9 +271,9 @@ class mc_varint(numeric_type):
     # https://github.com/PrismarineJS/minecraft-data/issues/119
     typename = "int64_t"
     postfix = "varint"
-
-    def length(self):
-        return f"size_varint({self.name})"
+    
+    def length(self, variable):
+        return f"{variable} += size_varint({self.name});",
 
 
 @mc_data_name("varlong")
@@ -271,31 +281,34 @@ class mc_varlong(numeric_type):
     typename = "int64_t"
     # Decoding varlongs is the same as decoding varints
     postfix = "varint"
-
-    def length(self):
-        return f"size_varlong({self.name})"
+    
+    def length(self, variable):
+        return f"{variable} += size_varlong({self.name});",
 
 
 @mc_data_name("string")
 class mc_string(simple_type):
     typename = "string_t"
     postfix = "string"
-
-    def length(self):
-        return f"size_string({self.name})"
+    
+    def length(self, variable):
+        return f"{variable} += size_string({self.name});",
 
 
 @mc_data_name("buffer")
 class mc_buffer(simple_type):
     typename = "char_vector_t"
     postfix = "buffer"
-
+    
     def __init__(self, name, parent, type_data, use_compare=False):
         super().__init__(name, parent, type_data, use_compare)
         self.count = mcd_type_map[type_data["countType"]]
 
-    def length(self):
-        return f"({self.count(f'{self.name}.size', self).length()} + sizeof(*{self.name}.data) * {self.name}.size)"
+    def length(self, variable):
+        return [
+            *self.count(f'{self.name}.size', self).length(variable),
+            f"{variable} += sizeof(*{self.name}.data) * {self.name}.size;"
+        ]
 
     def encoder(self):
         return (
@@ -311,9 +324,9 @@ class mc_buffer(simple_type):
 class mc_rest_buffer(simple_type):
     typename = "char_vector_t"
     postfix = "buffer"
-
-    def length(self):
-        return f"(sizeof(*{self.name}.data) * {self.name}.size)"
+    
+    def length(self, variable):
+        return f"{variable} += (sizeof(*{self.name}.data) * {self.name}.size);",
 
     def encoder(self):
         return f"stream_write(dest, {self.name}.data, {self.name}.size);",
@@ -328,9 +341,9 @@ class mc_rest_buffer(simple_type):
 @mc_data_name("nbt")
 class mc_nbt(simple_type):
     typename = "nbt_tag_compound"
-
-    def length(self):
-        return f"0 /* todo nbt length */"
+    
+    def length(self, variable):
+        return f"/* todo nbt length */",
 
     def encoder(self):
         return f"nbt_encode_full(dest, {self.name});", 
@@ -342,9 +355,9 @@ class mc_nbt(simple_type):
 @mc_data_name("optionalNbt")
 class mc_optional_nbt(simple_type):
     typename = "nbt_tag_compound_optional_t"
-
-    def length(self):
-        return f"0 /* todo nbt length */"
+    
+    def length(self, variable):
+        return f"/* todo nbt length */",
 
     def encoder(self):
         return (
@@ -410,7 +423,7 @@ class mc_particle(self_serializing_type):
 class vector_type(simple_type):
     element = ""
     count = mc_varint
-
+    
     def __init__(self, name, parent, type_data, use_compare=False):
         super().__init__(name, parent, type_data, use_compare)
         self.depth = 0
@@ -419,8 +432,11 @@ class vector_type(simple_type):
             self.depth += 1
             p = p.parent
 
-    def length(self):
-        return f"({self.count(f'{self.name}.size', self).length()} + sizeof(*{self.name}.data) * {self.name}.size)"
+    def length(self, variable):
+        return [
+            *self.count(f'{self.name}.size', self).length(variable),
+            f"{variable} += sizeof(*{self.name}.data) * {self.name}.size;"
+        ]
 
     def encoder(self):
         iterator = f"i{self.depth}"
@@ -456,6 +472,7 @@ class mc_tags(vector_type):
 
 @mc_data_name("option")
 class mc_option(simple_type):
+    
     def __init__(self, name, parent, type_data, use_compare=False):
         super().__init__(name, parent, type_data, use_compare)
         f_type, f_data = extract_type(type_data)
@@ -466,45 +483,84 @@ class mc_option(simple_type):
         else:
             self.typename = f"{self.name}_type_optional_t"
 
+    def parameter(self):
+        if isinstance(self.field, simple_type):
+            return super().parameter()
+        return f"{self.typename} {self.name}"
+
     def declaration(self):
         if isinstance(self.field, simple_type):
             type_definitions[self.typename] = [f"optional_typedef({self.field.typename})"]
             return super().declaration()
-        self.field.name = f"{self.name}_type"
+        self.field.temp_name(f"{self.name}_type")
         type_definitions[self.typename] = self.field.typedef()
         type_definitions[self.typename].append(f"optional_typedef({self.field.name})")
+        self.field.reset_name()
         return [f"{self.typename} {self.name};"]
 
-    def length(self):
-        self.field.name = f"{self.name}.value"
-        return f"(sizeof({self.name}.has_value) + {self.field.length()})"
+    def length(self, variable):
+        self.field.temp_name(f"{self.name}.value")
+        result = [
+            f"{variable} += sizeof({self.name}.has_value);", 
+            *self.field.length(variable)
+        ]
+        self.field.reset_name()
+        return result
 
     def encoder(self):
-        self.field.name = f"{self.name}.value"
-        return (
+        self.field.temp_name(f"{self.name}.value")
+        result = (
             f"enc_byte(dest, {self.name}.has_value);",
             f"if ({self.name}.has_value) {{",
             *(indent + line for line in self.field.encoder()),
             "}"
         )
+        self.field.reset_name()
+        return result
 
     def decoder(self):
         ret = [f"if (dec_byte(src)) {{"]
         if isinstance(self.field, numeric_type) or type(self.field) in (mc_string,
                                                                         mc_buffer, mc_rest_buffer):
-            self.field.name = self.name
+            self.field.temp_name(self.name)
         # todo check origin
         # /\ what does it mean? does it make sense?
         ret.append(f"{indent}{self.name}.has_value = true;")
-        self.field.name = f"{self.name}.value"
+        self.field.temp_name(f"{self.name}.value")
         ret.extend(indent + line for line in self.field.decoder())
+        self.field.reset_name()
         ret.append("}")
         return ret
 
 
 class complex_type(generic_type):
-    def length(self):
-        return "(" + reduce(lambda a, b: f"{a} + {b}", list(f.length() for f in self.fields), "0") + ")"
+    def length(self, variable):
+        ret = []
+        for field in self.fields:
+            ret.extend(field.length(variable))
+        return ret
+
+    def get_type(self):
+        result = self.internal_is_gtype_defined()
+        if result == 0:
+            return f"{self.name}_gtype"
+
+        code = ""
+        if result == 2:
+            code = str(abs(hash(tuple(list(f.name for f in self.fields)))))[:2]
+        name = f"{self.name}_g{code}type"
+
+    def parameter(self):
+        if self.name:
+            return f"{self.get_type()} {self.name}"
+        parameters = ""
+        for field in self.fields:
+            parameter = field.parameter()
+            if len(parameter) != 0:
+                parameters += f"{parameter}, "
+        if len(parameters) == 0:
+            return parameters
+        return parameters[:-2]
     
     def declaration(self):
         if self.name:
@@ -514,14 +570,14 @@ class complex_type(generic_type):
 
             code = ""
             if result == 2:
-                code = str(abs(hash(str(self.fields))))[:2]
+                code = str(abs(hash(tuple(list(f.name for f in self.fields)))))[:2]
             name = f"{self.name}_g{code}type"
 
             self.temp_name(name)
             type_definitions[self.name] = self.typedef()
             self.reset_name()
             return [f"{name} {self.name};"]
-        return self.internal_declaration()
+        return [l for f in self.fields for l in f.declaration()]
 
     def internal_is_gtype_defined(self):
         self.temp_name(f"{self.name}_gtype")
@@ -537,13 +593,11 @@ class complex_type(generic_type):
 
 
     def internal_declaration(self):
-        if self.name:
-            return [
-                "struct {",
-                *(indent + l for f in self.fields for l in f.declaration()),
-                f"}} {self.name};"
-            ]
-        return [l for f in self.fields for l in f.declaration()]
+        return [ # todo struct {self.name}
+            "struct {",
+            *(indent + l for f in self.fields for l in f.declaration()),
+            f"}} {self.name};"
+        ]
 
     def typedef(self):
         ret = self.internal_declaration()
@@ -564,6 +618,7 @@ def get_storage(numbits):
 
 @mc_data_name("bitfield")
 class mc_bitfield(complex_type):
+    
     def __init__(self, name, parent, type_data, use_compare=False):
         super().__init__(name, parent, type_data, use_compare)
         lookup_unsigned = {
@@ -602,8 +657,8 @@ class mc_bitfield(complex_type):
         self.storage = lookup_unsigned[total](f"{name}_", self)
         self.size = total // 8
 
-    def length(self):
-        return f"sizeof({self.storage.typename})"
+    def length(self, variable):
+        return f"{variable} += sizeof({self.storage.typename});",
 
     def encoder(self):
         ret = [*self.storage.initialization("0")]
@@ -634,6 +689,8 @@ class mc_bitfield(complex_type):
 # Whatever you think an MCD "switch" is you're probably wrong
 @mc_data_name("switch")
 class mc_switch(simple_type):
+    length_multiline = True
+    
     def __init__(self, name, parent, type_data, use_compare=False):
         super().__init__(name, parent, type_data, use_compare)
 
@@ -687,29 +744,34 @@ class mc_switch(simple_type):
 
         self.process_fields(self.name, type_data["fields"])
 
+    def parameter(self):
+        if self.null_switch:
+            return []
+        parameters = ""
+        for field in self.fields:
+            parameter = field.parameter()
+            if len(parameter) != 0:
+                parameters += f"{parameter}, "
+        if len(parameters) == 0:
+            return parameters
+        return parameters[:-2]
+
     def declaration(self):
         if self.null_switch:
             return []
         return [l for f in self.fields for l in f.declaration()]
 
-    def length(self):
-        has_name = hasattr(self.parent, "name") and self.parent.name
-        if has_name and self.parent.name.endswith("->"):
-            suffix = ""
-        else:
-            suffix = "."
-        ret = ""
-        for field in self.fields:
-            if has_name:
-                field.temp_name(f"{self.parent.name}{suffix}{field.name}")
-            ret += f"{field.length()} +"
-            if has_name:
-                field.reset_name()
-        if len(ret) < 2:
-            return "0"
-        return f"({ret[:-2]})"
+    def length(self, variable):
+        comp = self.get_compare()
+        if self.null_switch:
+            return "",
+        if self.is_inverse:
+            return self.inverse(comp, 2, variable)
+        if self.is_str_switch:
+            return self.str_switch(comp, 2, variable)
+        return self.union_multi(comp, 2, variable)
 
-    def code_fields(self, ret, fields, encode=True):
+    def code_fields(self, ret, fields, mode, variable=None):
         has_name = hasattr(self.parent, "name") and self.parent.name
         if has_name and self.parent.name.endswith("->"):
             suffix = ""
@@ -718,27 +780,29 @@ class mc_switch(simple_type):
         for field in fields:
             if has_name:
                 field.temp_name(f"{self.parent.name}{suffix}{field.name}")
-            if encode:
+            if mode == 0:
                 ret.extend(f"{indent}{l}" for l in field.encoder())
-            else:
+            elif mode == 1:
                 ret.extend(f"{indent}{l}" for l in field.decoder())
+            elif mode == 2:
+                ret.extend(f"{indent}{l}" for l in field.length(variable))
             if has_name:
                 field.reset_name()
         return ret
 
-    def inverse(self, comp, encode=True):
+    def inverse(self, comp, mode, variable=None):
         if len(self.field_dict.items()) == 1:
             case, _ = next(iter(self.field_dict.items()))
             ret = [f"if ({comp} != {case}) {{"]
         else:
             return "// Multi-Condition Inverse Not Yet Implemented",
-        self.code_fields(ret, self.fields, encode)
+        self.code_fields(ret, self.fields, mode, variable)
         ret.append("}")
         return ret
 
     # Special case for single condition switches, which are just optionals
     # mascarading as switches
-    def optional(self, comp, encode=True):
+    def optional(self, comp, mode, variable=None):
         case, fields = next(iter(self.field_dict.items()))
         ret = []
         if case == "true":
@@ -749,29 +813,29 @@ class mc_switch(simple_type):
             ret.append(f"if ({comp} == {case}) {{")
         else:
             ret.append(f"if (!strcmp({comp}, {case})) {{")
-        self.code_fields(ret, fields, encode)
+        self.code_fields(ret, fields, mode, variable)
         ret.append("}")
         return ret
 
-    def str_switch(self, comp, encode=True):
+    def str_switch(self, comp, mode, variable=None):
         items = list(self.field_dict.items())
         case, fields = items[0]
         ret = [f"if (!strcmp({comp}, {case})) {{"]
-        self.code_fields(ret, fields, encode)
+        self.code_fields(ret, fields, mode, variable)
         for case, fields in items[1:]:
             ret.append(f"}} else if (!strcmp({comp}, {case})) {{")
-            self.code_fields(ret, fields, encode)
+            self.code_fields(ret, fields, mode, variable)
         ret.append("}")
         return ret
 
-    def union_multi(self, comp, encode=True):
+    def union_multi(self, comp, mode, variable=None):
         if len(self.field_dict.items()) == 1:
-            return self.optional(comp, encode)
+            return self.optional(comp, mode, variable)
         ret = [f"switch ({comp}) {{"]
         for case, fields in self.field_dict.items():
             ret.append(f"{indent}case {case}:")
             tmp = []
-            self.code_fields(tmp, fields, encode)
+            self.code_fields(tmp, fields, mode, variable)
             ret.extend(indent + l for l in tmp)
             ret.append(f"{indent * 2}break;")
         ret.append("}")
@@ -804,20 +868,20 @@ class mc_switch(simple_type):
         if self.null_switch:
             return []
         if self.is_inverse:
-            return self.inverse(comp)
+            return self.inverse(comp, 0)
         if self.is_str_switch:
-            return self.str_switch(comp)
-        return self.union_multi(comp)
+            return self.str_switch(comp, 0)
+        return self.union_multi(comp, 0)
 
     def decoder(self):
         comp = self.get_compare()
         if self.null_switch:
             return []
         if self.is_inverse:
-            return self.inverse(comp, False)
+            return self.inverse(comp, 1)
         if self.is_str_switch:
-            return self.str_switch(comp, False)
-        return self.union_multi(comp, False)
+            return self.str_switch(comp, 1)
+        return self.union_multi(comp, 1)
 
     def process_fields(self, name, fields):
         for key, field_info in fields.items():
@@ -882,6 +946,8 @@ class mc_switch(simple_type):
 # field
 @mc_data_name("array")
 class mc_array(simple_type):
+    length_multiline=True
+
     def __init__(self, name, parent, type_data, use_compare=False):
         super().__init__(name, parent, type_data, use_compare)
         f_type, f_data = extract_type(type_data["type"])
@@ -914,13 +980,20 @@ class mc_array(simple_type):
 
         self.typename = f"{self.f_type}_vector_t"
 
-    def length(self):
+    def length(self, variable):
         if self.is_fixed:
-            return f"(sizeof(*{self.name}.data) * {self.name}.size)"
+            return self.fixed(2, variable)
         if self.is_prefixed:
-            self.count.name = f"{self.name}.size"
-            return f"({self.count.length()} + sizeof(*{self.name}.data) * {self.name}.size)"
-        return f"(sizeof(*{self.name}.data) * {self.name}.size)"
+            return self.prefixed_length(variable)
+        return self.foreign_length(variable)
+
+    def get_type(self):
+        if isinstance(self.field, simple_type):
+            return f"{self.field.typename}_vector_t"
+        return f"{self.field.name}_vector_t"
+
+    def parameter(self):
+        return f"{self.get_type()} {self.name}"
 
     def declaration(self):
         ret = []
@@ -940,39 +1013,59 @@ class mc_array(simple_type):
             ret.append(f"{typename} {self.name};")
         return ret
 
-    def fixed(self, encode=True):
+    def fixed(self, mode, variable=None):
         iterator = f"i{self.depth}"
-        self.field.name = f"{self.name}.data[{iterator}]"
+        self.field.temp_name(f"{self.name}.data[{iterator}]")
         ret = [f"for (int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{"]
-        if encode:
+        if mode == 0:
             ret.extend(indent + l for l in self.field.encoder())
-        else:
+        elif mode == 1:
             ret.extend(indent + l for l in self.field.decoder())
+        elif mode == 2:
+            ret.extend(indent + l for l in self.field.length(variable))
         ret.append("}")
+        self.field.reset_name()
         return ret
 
     def prefixed_encode(self):
         iterator = f"i{self.depth}"
         self.count.name = f"{self.name}.size"
-        self.field.name = f"{self.name}.data[{iterator}]"
-        return [
+        self.field.temp_name(f"{self.name}.data[{iterator}]")
+        result = [
             *self.count.encoder(),
             f"for (int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
             *(indent + l for l in self.field.encoder()),
             "}"
         ]
+        self.field.reset_name()
+        return result
 
     def prefixed_decode(self):
         iterator = f"i{self.depth}"
         self.count.name = ""
-        self.field.name = f"{self.name}.data[{iterator}]"
-        return [
+        self.field.temp_name(f"{self.name}.data[{iterator}]")
+        result = [
             f"{self.name}.size = {self.count.decoder()};",
             f"{self.name}.data = ({self.f_type}*) malloc({self.name}.size * sizeof({self.f_type}));",
             f"for (int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
             *(indent + l for l in self.field.decoder()),
             "}"
         ]
+        self.field.reset_name()
+        return result
+    
+    def prefixed_length(self, variable):
+        iterator = f"i{self.depth}"
+        self.count.name = f"{self.name}.size"
+        self.field.temp_name(f"{self.name}.data[{iterator}]")
+        result = [
+            *self.count.length(variable),
+            f"for (int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
+            *(indent + l for l in self.field.length(variable)),
+            "}"
+        ]
+        self.field.reset_name()
+        return result
 
     # Identical to switches' compareTo
     def get_foreign(self):
@@ -993,34 +1086,49 @@ class mc_array(simple_type):
 
     def foreign_encode(self):
         iterator = f"i{self.depth}"
-        self.field.name = f"{self.name}.data[{iterator}]"
-        return [
+        self.field.temp_name(f"{self.name}.data[{iterator}]")
+        result = [
             f"for (int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
             *(indent + l for l in self.field.encoder()),
             "}"
         ]
+        self.field.reset_name()
+        return result
 
     def foreign_decode(self):
         iterator = f"i{self.depth}"
-        self.field.name = f"{self.name}.data[{iterator}]"
-        return [
+        self.field.temp_name(f"{self.name}.data[{iterator}]")
+        result = [
             f"{self.name}.size = {self.get_foreign()};",
             f"{self.name}.data = ({self.f_type}*) malloc({self.name}.size * sizeof({self.f_type}));",
             f"for (int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
             *(indent + l for l in self.field.decoder()),
             "}"
         ]
+        self.field.reset_name()
+        return result
+
+    def foreign_length(self, variable):
+        iterator = f"i{self.depth}"
+        self.field.temp_name(f"{self.name}.data[{iterator}]")
+        result = [
+            f"for (int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
+            *(indent + l for l in self.field.length(variable)),
+            "}"
+        ]
+        self.field.reset_name()
+        return result
 
     def encoder(self):
         if self.is_fixed:
-            return self.fixed()
+            return self.fixed(0)
         if self.is_prefixed:
             return self.prefixed_encode()
         return self.foreign_encode()
 
     def decoder(self):
         if self.is_fixed:
-            return self.fixed(False)
+            return self.fixed(1)
         if self.is_prefixed:
             return self.prefixed_decode()
         return self.foreign_decode()
@@ -1038,6 +1146,22 @@ class mc_container(complex_type):
         for field_info in type_data:
             f_name, f_type, f_data = extract_field(field_info)
             self.fields.append(mcd_type_map[f_type](f_name, self, f_data))
+
+    def length(self, variable):
+        ret = []
+        if self.name:
+            if self.name.endswith("->"):
+                suffix = ""
+            else:
+                suffix = "."
+            for field in self.fields:
+                field.temp_name(f"{self.name}{suffix}{field.name}")
+                ret.extend(field.length(variable))
+                field.reset_name()
+        else:
+            for field in self.fields:
+                ret.extend(field.length(variable))
+        return ret
 
     def encoder(self):
         ret = []
@@ -1076,23 +1200,25 @@ class mc_container(complex_type):
             return False
         return all([i == j for i, j in zip(self.fields, value.fields)])
 
-
-def get_decoder_and_length(field):
+def get_length(field):
     field.temp_name("this->" + field.name)
-    string = tuple(list(field.decoder()) + [f"{packet_read_length_variable} += {field.length()};"])
+    string = field.length(packet_length_variable)
     field.reset_name()
     return string
+
+def get_decoder_and_length(field):
+    field.temp_name("this->" + field.name) 
+    result = [
+        *field.decoder(),
+        *field.length(packet_read_length_variable)
+    ]
+    field.reset_name()
+    return result
 
 
 def get_encoder(field):
     field.temp_name("this->" + field.name)
     string = field.encoder()
-    field.reset_name()
-    return string
-
-def get_length(field):
-    field.temp_name("this->" + field.name)
-    string = field.length()
     field.reset_name()
     return string
 
@@ -1110,28 +1236,22 @@ class packet:
             f_name, f_type, f_data = extract_field(data_field)
             self.fields.append(mcd_type_map[f_type](f_name, self, f_data))
 
-    def length(self):
-        return "(" + reduce(lambda a, b: f"{a} + {b}", list(get_length(f) for f in self.fields), "0") + ")"
+    def parameters(self):
+        parameters = ""
+        for field in self.fields:
+            parameter = field.parameter()
+            if len(parameter) != 0:
+                parameters += f", {parameter}"
+        return parameters
 
     def declaration(self): 
-        declaration = ""
-        constructor = ""
-        for field in self.fields:
-            for line in field.declaration():
-                declaration += f"{indent}{line}\n"
-                constructor += line
-        declaration = declaration[:-1]
-        constructor = constructor.replace(";", ", ")[:-2]
-        if len(constructor) > 0:
-            constructor = ", " + constructor
-
         return [
             f"typedef struct {self.class_name} {{",
             f"{indent}mcpacket_t mcpacket;",
-            declaration,
+            *(indent + l for f in self.fields for l in f.declaration()),
             f"}} {self.class_name};",
             f"void {self.class_name}_new({self.class_name}* this);",
-            f"void {self.class_name}_new_full({self.class_name}* this{constructor});",
+            f"void {self.class_name}_new_full({self.class_name}* this{self.parameters()});",
             f"void {self.class_name}_encode(stream_t dest, {self.class_name}* this);", 
             f"void {self.class_name}_decode(stream_t src, {self.class_name}* this, size_t {packet_length_variable});",
             f"void {self.class_name}_decode_full(stream_t src, {self.class_name}* this);",
@@ -1140,7 +1260,8 @@ class packet:
     def encoder(self):
         return [
             f"void {self.class_name}_encode(stream_t dest, {self.class_name}* this) {{",
-            f"{indent}size_t {packet_length_variable} = (size_varlong(this->mcpacket.id) + {self.length()});",
+            f"{indent}size_t {packet_length_variable} = size_varlong(this->mcpacket.id);",
+            *(indent + l for f in self.fields for l in get_length(f)),
             f"{indent}enc_varint(dest, {packet_length_variable});",
             f"{indent}enc_varint(dest, this->mcpacket.id);",
             *(indent + l for f in self.fields for l in get_encoder(f)),
@@ -1184,22 +1305,11 @@ class packet:
         ]
 
     def full_constructor(self):
-        fields = ""
-        constructor = ""
-        for field in self.fields:
-            fields += f"{indent}this->{field.name} = {field.name};\n"
-            for line in field.declaration():
-                constructor += line
-        fields = fields[:-1]
-        constructor = constructor.replace(";", ", ")[:-2]
-        if len(constructor) > 0:
-            constructor = ", " + constructor
-
         return [
-            f"void {self.class_name}_new_full({self.class_name}* this{constructor}) {{",
+            f"void {self.class_name}_new_full({self.class_name}* this{self.parameters()}) {{",
             f"{indent}{self.class_name}_new(this);",
             # todo create immutable mcpackets and assign pointers?
-            fields,
+            *(f"{indent}this->{f.name} = {f.name};" for f in self.fields),
             "}"
         ]
 
@@ -1452,6 +1562,10 @@ def run(version):
         header_upper.extend(type_definitions[type_definition])
         header_upper.append(" ")
 
+    for length_function in length_functions:
+        impl_upper.extend(length_functions[length_function])
+        impl_upper.append(" ")
+
     header = header_upper + header_lower + ["#endif /* MCP_PROTOCOL_H */", ""]
     impl = impl_upper + impl_lower + make_packet + [""]
 
@@ -1461,7 +1575,7 @@ def run(version):
 
     if not os.path.exists(f"{path}mcp"):
         os.mkdir(f"{path}mcp")
-    #todo strange issue with generated types, sometimes they error. debug it
+        
     with open(f"{path}mcp/particles.h", "w") as f:
         f.write("\n".join(particle_header))
     with open(f"{path}protocol.c", "w") as f:
