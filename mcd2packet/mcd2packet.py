@@ -1351,7 +1351,7 @@ all_cap_re = re.compile("([a-z0-9])([A-Z])")
 def to_enum(name, direction, state):
     s1 = first_cap_re.sub(r"\1_\2", name)
     name = all_cap_re.sub(r"\1_\2", s1).upper()
-    d = "SB" if direction == "toServer" else "CB"
+    d = "CL" if direction == "toServer" else "SV"
     st = {"handshaking": "HS", "status": "ST", "login": "LG",
           "play": "PL"}[state]
     return f"MCP_{d}_{st}_{name}"
@@ -1389,7 +1389,7 @@ def run(version):
         f"#define MC_VERSION \"{version.replace('_', '.')}\"",
         f"#define MC_PROTOCOL_VERSION {mcd.version['version']}",
         "",
-        "typedef void mcpacket_handler(void* packet, size_t length);",
+        "typedef void mcpacket_handler(stream_t src, size_t length);",
         "",
         "typedef enum mcpacket_source {",
         "  MCP_SOURCE_CLIENT,",

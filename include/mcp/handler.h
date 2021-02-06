@@ -28,11 +28,18 @@ typedef struct mcp_generic_packet {
 
     /* defines */
 /**
- * @brief get a handler for packet
+ * @brief get a handler for a packet
  * 
  * @warning very unsafe, throws segmentation fault on error/corrupts the stream silently when reading
  */
 #define mcp_get_packet_handler(state, source, id) mcp_protocol_handlers[state][source][id]
+
+/**
+ * @brief set a handler for a packet
+ * 
+ * @warning very unsafe, throws segmentation fault on error/corrupts the stream silently when reading
+ */
+#define mcp_set_packet_handler(state, source, id, handler) mcp_protocol_handlers[state][source][id] = handler
 
     /* functions */
 /**
@@ -54,13 +61,13 @@ void mcp_handle_packet(stream_t src, mcpacket_handler* handler);
  * 
  * @param packet incoming packet
  */
-void mcp_blank_handler(void* packet, size_t length);
+void mcp_blank_handler(stream_t src, size_t length);
 
 /**
  * @brief packet handler for debugging
  * 
  * @param packet incoming packet
  */
-void mcp_debug_handler(void* packet, size_t length);
+void mcp_debug_handler(stream_t src, size_t length);
 
 #endif /* MCP_HANDLER_H */

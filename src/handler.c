@@ -19,10 +19,8 @@
 void mcp_handle_packet_global(stream_t src, mcpacket_state state, mcpacket_source source) {
     size_t length = dec_varint(src);
     int id = dec_varint(src);
-    char* buffer = (char*) malloc(sizeof(char) * (length - size_varint(id)));
     mcpacket_handler* handler = mcp_get_packet_handler(state, source, id);
-    handler(buffer, length);
-    free(buffer);
+    handler(src, length - size_varint(id));
 }
 
 /**
@@ -33,9 +31,7 @@ void mcp_handle_packet_global(stream_t src, mcpacket_state state, mcpacket_sourc
 void mcp_handle_packet(stream_t src, mcpacket_handler* handler) {
     size_t length = dec_varint(src);
     int id = dec_varint(src);
-    char* buffer = (char*) malloc(sizeof(char) * (length - size_varint(id)));
-    handler(buffer, length);
-    free(buffer);
+    handler(src, length - size_varint(id));
 }
 
 /**
@@ -43,14 +39,8 @@ void mcp_handle_packet(stream_t src, mcpacket_handler* handler) {
  * 
  * @param packet incoming packet
  */
-void mcp_blank_handler(void* packet, size_t length) { }
-
-/**
- * @brief packet handler for debugging
- * 
- * @param packet incoming packet
- */
-void mcp_debug_handler(void* packet, size_t length) {
-    mcp_generic_packet internal = *((mcp_generic_packet*) packet);
-    printf("mcpacket: mcp_debug_handler: received packet %s with id %d\n", internal.packet.name, internal.packet.id);
+void mcp_blank_handler(stream_t src, size_t length) {
+    char* buffer = (char*) malloc(length);
+    stream_read(src, buffer, length);
+    free(buffer);
 }
