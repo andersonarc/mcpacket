@@ -334,7 +334,7 @@ class mc_rest_buffer(simple_type):
     def decoder(self):
         return (
             f"{self.name}.size = {packet_length_variable} - {packet_read_length_variable};",
-            f"stream_read(src, {self.name}.data, {self.name}.size)",
+            f"stream_read(src, {self.name}.data, {self.name}.size);",
         )
 
 
@@ -481,7 +481,7 @@ class mc_option(simple_type):
         if isinstance(self.field, simple_type):
             self.typename = f"{self.field.typename}_optional_t"
         else:
-            self.typename = f"{self.name}_type_optional_t"
+            self.typename = f"mcp_type_{self.name}_optional_t"
 
     def parameter(self):
         if isinstance(self.field, simple_type):
@@ -492,7 +492,7 @@ class mc_option(simple_type):
         if isinstance(self.field, simple_type):
             type_definitions[self.typename] = [f"optional_typedef({self.field.typename})"]
             return super().declaration()
-        self.field.temp_name(f"{self.name}_type")
+        self.field.temp_name(f"mcp_type_{self.name}")
         type_definitions[self.typename] = self.field.typedef()
         type_definitions[self.typename].append(f"optional_typedef({self.field.name})")
         self.field.reset_name()
@@ -540,15 +540,19 @@ class complex_type(generic_type):
             ret.extend(field.length(variable))
         return ret
 
-    def get_type(self):
-        result = self.internal_is_gtype_defined()
-        if result == 0:
-            return f"{self.name}_gtype"
+    def get_hash(self):
+        return str(abs(hash(tuple(list(f.name for f in self.fields)))))[:2]
 
-        code = ""
-        if result == 2:
-            code = str(abs(hash(tuple(list(f.name for f in self.fields)))))[:2]
-        name = f"{self.name}_g{code}type"
+    def format_type(self, is_g_type):
+        if is_g_type:
+            return f"mcp_type_{self.name}{self.get_hash()}"
+        return f"mcp_type_{self.name}"
+
+    def get_type(self):
+        result = self.internal_is_defined()
+        if result == 0:
+            return self.format_type(True)
+        return self.format_type(result == 1)
 
     def parameter(self):
         if self.name:
@@ -564,14 +568,10 @@ class complex_type(generic_type):
     
     def declaration(self):
         if self.name:
-            result = self.internal_is_gtype_defined()
+            result = self.internal_is_defined()
+            name = self.format_type(result == 1)
             if result == 0:
-                return [f"{self.name}_gtype {self.name};"]
-
-            code = ""
-            if result == 2:
-                code = str(abs(hash(tuple(list(f.name for f in self.fields)))))[:2]
-            name = f"{self.name}_g{code}type"
+                return [f"{name} {self.name};"]
 
             self.temp_name(name)
             type_definitions[self.name] = self.typedef()
@@ -579,30 +579,24 @@ class complex_type(generic_type):
             return [f"{name} {self.name};"]
         return [l for f in self.fields for l in f.declaration()]
 
-    def internal_is_gtype_defined(self):
-        self.temp_name(f"{self.name}_gtype")
+    def internal_is_defined(self):
+        self.temp_name(self.format_type(False))
         if self.name in type_definitions:
             if type_definitions[self.name] == self.typedef():
-                code = 0 # no need to create a typedef
+                code = 0 # no need to create a typedef (without hash)
             else:
-                code = 2 # create a new typedef with hash
+                code = 2 # create a new typedef (with hash)
         else:
-            code = 1 # create a new typedef without hash
+            code = 1 # create a new typedef (without hash)
         self.reset_name()
         return code
 
-
-    def internal_declaration(self):
-        return [ # todo struct {self.name}
-            "struct {",
+    def typedef(self):
+        return [ 
+            f"typedef struct {self.name} {{",
             *(indent + l for f in self.fields for l in f.declaration()),
             f"}} {self.name};"
         ]
-
-    def typedef(self):
-        ret = self.internal_declaration()
-        ret[0] = f"typedef {ret[0]}"
-        return ret
 
 
 def get_storage(numbits):
@@ -1002,7 +996,7 @@ class mc_array(simple_type):
             typename = f"{self.f_type}_vector_t"
             type_definitions[typename] = [f"vector_typedef({self.f_type})"]
         else:
-            self.field.name = f"{self.packet.packet_name}_{self.name}_type"
+            self.field.name = f"mcp_type_{self.packet.packet_name}_{self.name}"
             typename = f"{self.field.name}_vector_t"
             type_definitions[typename] = self.field.typedef()
             self.f_type = self.field.name
@@ -1225,11 +1219,11 @@ def get_encoder(field):
 class packet:
     def __init__(self, state, direction, packet_id, packet_name, data):
         self.state = state
-        self.direction = "Clientbound" if direction == "toClient" else "Serverbound"
+        self.source = "server" if direction == "toClient" else "client"
         self.packet_id = packet_id
         self.packet_name = packet_name
         self.data = data
-        self.class_name = f"{self.direction}{self.packet_name}"
+        self.class_name = f"mcp_packet_{self.source}_{self.packet_name}"
 
         self.fields = []
         for data_field in data:
@@ -1250,16 +1244,16 @@ class packet:
             f"{indent}mcpacket_t mcpacket;",
             *(indent + l for f in self.fields for l in f.declaration()),
             f"}} {self.class_name};",
-            f"void {self.class_name}_new({self.class_name}* this);",
-            f"void {self.class_name}_new_full({self.class_name}* this{self.parameters()});",
-            f"void {self.class_name}_encode(stream_t dest, {self.class_name}* this);", 
-            f"void {self.class_name}_decode(stream_t src, {self.class_name}* this, size_t {packet_length_variable});",
-            f"void {self.class_name}_decode_full(stream_t src, {self.class_name}* this);",
+            f"void {self.class_name}_init({self.class_name}* this);",
+            f"void {self.class_name}_init_full({self.class_name}* this{self.parameters()});",
+            f"void {self.class_name}_encode({self.class_name}* this, stream_t dest);", 
+            f"void {self.class_name}_decode({self.class_name}* this, stream_t src, size_t {packet_length_variable});",
+            f"void {self.class_name}_decode_full({self.class_name}* this, stream_t src);",
         ]
 
     def encoder(self):
         return [
-            f"void {self.class_name}_encode(stream_t dest, {self.class_name}* this) {{",
+            f"void {self.class_name}_encode({self.class_name}* this, stream_t dest) {{",
             f"{indent}size_t {packet_length_variable} = size_varlong(this->mcpacket.id);",
             *(indent + l for f in self.fields for l in get_length(f)),
             f"{indent}enc_varint(dest, {packet_length_variable});",
@@ -1270,14 +1264,14 @@ class packet:
 
     def decoder(self):
         return [
-            f"void {self.class_name}_decode(stream_t src, {self.class_name}* this, size_t {packet_length_variable}) {{",
+            f"void {self.class_name}_decode({self.class_name}* this, stream_t src, size_t {packet_length_variable}) {{",
             f"{indent}size_t {packet_read_length_variable} = size_varlong(this->mcpacket.id);",
             *(indent + l for f in self.fields for l in get_decoder_and_length(f)),
             f"{indent}if ({packet_read_length_variable} != {packet_length_variable}) {{",
             f"{indent*2}runtime_warning(\"mcpacket: {self.class_name}_decode: can't decode full packet\\n\");",
             f"{indent*2}size_t left = {packet_length_variable} - {packet_read_length_variable};",
             f"{indent*2}char* clean_buffer = malloc(sizeof(char) * left);",
-            f"{indent*2}stream_read(src, clean_buffer, left);", #todo stream stuff remove ; at end macro
+            f"{indent*2}stream_read(src, clean_buffer, left);",
             f"{indent*2}free(clean_buffer);",
             f"{indent}}}",
             "}"
@@ -1285,20 +1279,20 @@ class packet:
 
     def full_decoder(self):
         return [
-            f"void {self.class_name}_decode_full(stream_t src, {self.class_name}* this) {{",
+            f"void {self.class_name}_decode_full({self.class_name}* this, stream_t src) {{",
             f"{indent}size_t {packet_length_variable} = dec_varint(src);",
             f"{indent}if (this->mcpacket.id != dec_varint(src)) {{",
             f"{indent*2}runtime_error(\"mcpacket: {self.class_name}_decode: incoming packet id differs with local\\n\");",
             f"{indent}}}",
-            f"{indent}{self.class_name}_decode(src, this, {packet_length_variable});",
+            f"{indent}{self.class_name}_decode(this, src, {packet_length_variable});",
             "}"
         ]
 
     def constructor(self):
         return [
-            f"void {self.class_name}_new({self.class_name}* this) {{",
+            f"void {self.class_name}_init({self.class_name}* this) {{",
             f"{indent}this->mcpacket.state = MCP_STATE_{self.state.upper()};",
-            f"{indent}this->mcpacket.direction = MCP_DIRECTION_{self.direction.upper()};",
+            f"{indent}this->mcpacket.source = MCP_SOURCE_{self.source.upper()};",
             f"{indent}this->mcpacket.id = {self.packet_id};",
             f"{indent}this->mcpacket.name = \"{self.class_name}\";",
             "}"
@@ -1306,8 +1300,8 @@ class packet:
 
     def full_constructor(self):
         return [
-            f"void {self.class_name}_new_full({self.class_name}* this{self.parameters()}) {{",
-            f"{indent}{self.class_name}_new(this);",
+            f"void {self.class_name}_init_full({self.class_name}* this{self.parameters()}) {{",
+            f"{indent}{self.class_name}_init(this);",
             # todo create immutable mcpackets and assign pointers?
             *(f"{indent}this->{f.name} = {f.name};" for f in self.fields),
             "}"
@@ -1386,10 +1380,7 @@ def run(version):
         "#define MCP_PROTOCOL_H",
         "",
         "#include <stdint.h>",
-        "#include <malloc.h>",
-        "#include <string.h>",
-        "#include <unistd.h>",
-        "#include \"mcp/handler.h\"",
+        "#include \"mcp/stream.h\"",
         "#include \"mcp/particles.h\"",
         "#include \"mcp/misc.h\"",
         "#include \"mcp/types.h\"",
@@ -1398,11 +1389,13 @@ def run(version):
         f"#define MC_VERSION \"{version.replace('_', '.')}\"",
         f"#define MC_PROTOCOL_VERSION {mcd.version['version']}",
         "",
-        "typedef enum mcpacket_direction {",
-        "  MCP_DIRECTION_SERVERBOUND,",
-        "  MCP_DIRECTION_CLIENTBOUND,",
-        "  MCP_DIRECTION__MAX",
-        "} mcpacket_direction;",
+        "typedef void mcpacket_handler(void* packet, size_t length);",
+        "",
+        "typedef enum mcpacket_source {",
+        "  MCP_SOURCE_CLIENT,",
+        "  MCP_SOURCE_SERVER,",
+        "  MCP_SOURCE__MAX",
+        "} mcpacket_source;",
         "",
         "typedef enum mcpacket_state {",
         "  MCP_STATE_HANDSHAKING,",
@@ -1414,28 +1407,30 @@ def run(version):
         "",
         "typedef struct mcpacket_t {",
         "  mcpacket_state state;",
-        "  mcpacket_direction direction;",
+        "  mcpacket_source source;",
         "  int id;",
         "  const string_t name; ",
         "} mcpacket_t;",
         ""
             ]
     header_lower = [
-        "extern const char** mcp_protocol_cstrings[MCP_STATE__MAX][MCP_DIRECTION__MAX];",
-        "extern mcp_packet_handler_t** mcp_protocol_handlers[MCP_STATE__MAX][MCP_DIRECTION__MAX]; // todo not sure that it works as expected",
-        "extern const int mcp_protocol_max_ids[MCP_STATE__MAX][MCP_DIRECTION__MAX];",
-        "",
-        "mcpacket_t* mcpacket_parse(mcpacket_state state, mcpacket_direction direction, int mcpacket_id);",
+        "extern const char** mcp_protocol_cstrings[MCP_STATE__MAX][MCP_SOURCE__MAX];",
+        "extern mcpacket_handler** mcp_protocol_handlers[MCP_STATE__MAX][MCP_SOURCE__MAX]; // todo not sure that it works as expected",
+        "extern const int mcp_protocol_max_ids[MCP_STATE__MAX][MCP_SOURCE__MAX];",
         ""
     ]
     impl_upper = [
         *warning_impl,
         f"/* MCD version {version.replace('_', '.')} */",
-        f"#include \"mcp/protocol.h\"",
+        "#include <malloc.h>",
+        "#include <string.h>",
+        "#include \"mcp/protocol.h\"",
+        "#include \"mcp/handler.h\"",
         ""
     ]
     impl_lower = []
     particle_header = [
+        #todo problem - decoder fails reading extra bytes?
         *warning_particle,
         f"/* MCD version {version.replace('_', '.')} */",
         "#ifndef MCP_PARTICLES_H",
@@ -1478,79 +1473,51 @@ def run(version):
 
     for state in mc_states: 
         for direction in mc_directions:
-            dr = "clientbound" if direction == "toClient" else "serverbound"
+            dr = "server" if direction == "toClient" else "client"
             packet_enum[state][direction].append(f"MCP_{dr.upper()}_{state.upper()}__MAX")
             header_upper.append(f"enum mcp_{dr}_{state}_ids {{")
             header_upper.extend(f"{indent}{l}," for l in packet_enum[state][direction])
             header_upper[-1] = header_upper[-1][:-1]
-            header_upper.extend(("};", ""))
-            header_upper.append(f"extern mcp_packet_handler_t* mcp_{dr}_{state}_handlers[MCP_{dr.upper()}_{state.upper()}__MAX];")
+            header_upper.append("};")
+            header_upper.append(f"extern mcpacket_handler* mcp_{dr}_{state}_handlers[MCP_{dr.upper()}_{state.upper()}__MAX];")
             header_upper.append(f"extern const char* mcp_{dr}_{state}_cstrings[MCP_{dr.upper()}_{state.upper()}__MAX];")
-
-    make_packet = [
-        "mcpacket_t* mcpacket_parse(mcpacket_state state, mcpacket_direction direction, int mcpacket_id) {",
-        "  /*switch(state) {"
-    ]
+            header_upper.append("")
 
     for state in mc_states:
-        make_packet.append(f"{indent * 2}case {state.upper()}:")
-        make_packet.append(f"{indent * 3}switch (direction) {{")
         for direction in mc_directions:
-            dr = "CLIENTBOUND" if direction == "toClient" else "SERVERBOUND"
-            make_packet.append(f"{indent * 4}case {dr}:")
-            make_packet.append(f"{indent * 5}switch (packet_id) {{")
+            dr = "server" if direction == "toClient" else "client"
+            impl_upper.append(f"const char* mcp_{dr}_{state}_cstrings[] = {{")
             for pak in packets[state][direction]:
-                make_packet.append(f"{indent * 6} case {pak.packet_id}:")
-                make_packet.append(f"{indent * 7} return "
-                                   f"{pak.class_name};")
-            make_packet.append(f"{indent * 6}default:")
-            make_packet.append(f"{indent * 7}runtime_error(\"Invalid "
-                               "Packet Id\");")
-            make_packet.append(f"{indent * 5}}}")
-        make_packet.append(f"{indent * 4}default:")
-        make_packet.append(f"{indent * 5}runtime_error(\"Invalid "
-                           "Packet Direction\");")
-        make_packet.append(f"{indent * 3}}}")
-    make_packet.append(f"{indent * 2}default:")
-    make_packet.append(f"{indent * 3}runtime_error(\"Invalid "
-                       "Packet State\");")
-    make_packet.extend((f"{indent}}}*/ return NULL;", "}", ""))
-
-    for state in mc_states:
-        for direction in mc_directions:
-            if packets[state][direction]:
-                dr = "clientbound" if direction == "toClient" else "serverbound"
-                impl_upper.append(f"const char* mcp_{dr}_{state}_cstrings[] = {{")
-                for pak in packets[state][direction]:
-                    impl_upper.append(f"{indent}\"{pak.class_name}\",")
+                impl_upper.append(f"{indent}\"{pak.class_name}\",")
+            if len(packets[state][direction]) > 1:
                 impl_upper[-1] = impl_upper[-1][:-1]
-                impl_upper.extend(("};", ""))
-                impl_upper.append(f"mcp_packet_handler_t* mcp_{dr}_{state}_handlers[MCP_{dr.upper()}_{state.upper()}__MAX] = {{")
-                if len(packet_enum[state][direction]) > 1:
-                    impl_upper.extend([f"{indent}&mcp_blank_handler,"] * (len(packet_enum[state][direction]) - 1))
-                    impl_upper[-1] = impl_upper[-1][:-1]
-                impl_upper.extend(("};", ""))
+            impl_upper.extend(("};", ""))
+            impl_upper.append(f"mcpacket_handler* mcp_{dr}_{state}_handlers[MCP_{dr.upper()}_{state.upper()}__MAX] = {{")
+            if len(packets[state][direction]) > 1:
+                impl_upper.extend([f"{indent}&mcp_blank_handler,"] * (len(packet_enum[state][direction]) - 1))
+                impl_upper[-1] = impl_upper[-1][:-1]
+            impl_upper.extend(("};", ""))
 
     impl_upper += [
-        "const char** mcp_protocol_cstrings[MCP_STATE__MAX][MCP_DIRECTION__MAX] = {",
-        f"{indent}{{mcp_serverbound_handshaking_cstrings}},",
-        f"{indent}{{mcp_serverbound_status_cstrings, mcp_clientbound_status_cstrings}},",
-        f"{indent}{{mcp_serverbound_login_cstrings, mcp_clientbound_login_cstrings}},",
-        f"{indent}{{mcp_serverbound_play_cstrings, mcp_clientbound_play_cstrings}}",
+        "const char** mcp_protocol_cstrings[MCP_STATE__MAX][MCP_SOURCE__MAX] = {",
+        f"{indent}{{mcp_client_handshaking_cstrings, mcp_server_handshaking_cstrings}},",
+        f"{indent}{{mcp_client_status_cstrings, mcp_server_status_cstrings}},",
+        f"{indent}{{mcp_client_login_cstrings, mcp_server_login_cstrings}},",
+        f"{indent}{{mcp_client_play_cstrings, mcp_server_play_cstrings}}",
         "};",
         "",
-        "mcp_packet_handler_t** mcp_protocol_handlers[MCP_STATE__MAX][MCP_DIRECTION__MAX] = {",
-        f"{indent}{{mcp_serverbound_handshaking_handlers}},",
-        f"{indent}{{mcp_serverbound_status_handlers, mcp_clientbound_status_handlers}},",
-        f"{indent}{{mcp_serverbound_login_handlers, mcp_clientbound_login_handlers}},",
-        f"{indent}{{mcp_serverbound_play_handlers, mcp_clientbound_play_handlers}}",
+        "mcpacket_handler** mcp_protocol_handlers[MCP_STATE__MAX][MCP_SOURCE__MAX] = {",
+        f"{indent}{{mcp_client_handshaking_handlers, mcp_server_handshaking_handlers}},",
+        f"{indent}{{mcp_client_status_handlers, mcp_server_status_handlers}},",
+        f"{indent}{{mcp_client_login_handlers, mcp_server_login_handlers}},",
+        f"{indent}{{mcp_client_play_handlers, mcp_server_play_handlers}}",
         "};",
         "",
-        "const int mcp_protocol_max_ids[MCP_STATE__MAX][MCP_DIRECTION__MAX] = {",
-        f"{indent}{{MCP_SERVERBOUND_HANDSHAKING__MAX, MCP_CLIENTBOUND_HANDSHAKING__MAX}},",
-        f"{indent}{{MCP_SERVERBOUND_STATUS__MAX, MCP_CLIENTBOUND_STATUS__MAX}},",
-        f"{indent}{{MCP_SERVERBOUND_LOGIN__MAX, MCP_CLIENTBOUND_LOGIN__MAX}},",
-        f"{indent}{{MCP_SERVERBOUND_PLAY__MAX, MCP_CLIENTBOUND_PLAY__MAX}}",
+        "const int mcp_protocol_max_ids[MCP_STATE__MAX][MCP_SOURCE__MAX] = {",
+        f"{indent}{{MCP_CLIENT_HANDSHAKING__MAX, MCP_SERVER_HANDSHAKING__MAX}},",
+        f"{indent}{{MCP_CLIENT_STATUS__MAX, MCP_SERVER_STATUS__MAX}},",
+        f"{indent}{{MCP_CLIENT_LOGIN__MAX, MCP_SERVER_LOGIN__MAX}},",
+        f"{indent}{{MCP_CLIENT_PLAY__MAX, MCP_SERVER_PLAY__MAX}}",
         "};",
         "",
     ]
@@ -1567,7 +1534,7 @@ def run(version):
         impl_upper.append(" ")
 
     header = header_upper + header_lower + ["#endif /* MCP_PROTOCOL_H */", ""]
-    impl = impl_upper + impl_lower + make_packet + [""]
+    impl = impl_upper + impl_lower + [""]
 
     path = ""
     if "MCP_PATH" in os.environ:

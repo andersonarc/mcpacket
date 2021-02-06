@@ -27,7 +27,7 @@
  * 
  * @return number of bytes written or -1
  */
-#define stream_write(stream, buffer, count) write(stream, buffer, count);
+#define stream_write(stream, buffer, count) write(stream, buffer, count)
 
 /**
  * @brief read from a stream
@@ -38,7 +38,7 @@
  * 
  * @return number of bytes read or -1
  */
-#define stream_read(stream, buffer, count) read(stream, buffer, count);
+#define stream_read(stream, buffer, count) read(stream, buffer, count)
 
 /**
  * @brief write a variable to a stream
@@ -51,7 +51,7 @@
  * 
  * @return number of bytes written or -1
  */
-#define stream_write_variable(stream, variable) write(stream, &(variable), sizeof(variable));
+#define stream_write_variable(stream, variable) write(stream, &(variable), sizeof(variable))
 
 /**
  * @brief read a variable from a stream
@@ -64,6 +64,6 @@
  * 
  * @return number of bytes read or -1
  */
-#define stream_read_variable(stream, variable) read(stream, &(variable), sizeof(variable));
+#define stream_read_variable(stream, variable) read(stream, &(variable), sizeof(variable))
 
 #endif /* MCP_STREAM_H */
