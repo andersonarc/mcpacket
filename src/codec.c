@@ -547,6 +547,7 @@ void mcp_varint_encode(uint64_t* this, stream_t dest) {
 void mcp_varint_decode(uint64_t* this, stream_t src) {
   int i = 0;
   uint64_t j = 0;
+  *this = 0;
   stream_read(src, &j, SINGLE_BYTE);
   for(; j & 0x80; i += 7) {
     stream_read(src, &j, SINGLE_BYTE);
