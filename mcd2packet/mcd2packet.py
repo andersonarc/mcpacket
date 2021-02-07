@@ -1319,13 +1319,15 @@ class packet:
             f"{indent}size_t {packet_read_length_variable} = size_varlong(this->mcpacket.id);",
             *tmp,
             *fields,
-            f"{indent}if ({packet_read_length_variable} != {packet_length_variable}) {{",
+            f"{indent}if ({packet_read_length_variable} > {packet_length_variable}) {{",
+            f"{indent*2}logw_f(\"read %zd extra bytes\", \"{self.class_name}_decode\", {packet_read_length_variable} - {packet_length_variable});",
+            f"{indent}}} else if ({packet_read_length_variable} < {packet_length_variable}) {{",
             f"{indent*2}size_t left = {packet_length_variable} - {packet_read_length_variable};",
-            f"{indent*2}logw_f(\"unable to decode full packet: %zd bytes left\\n\", \"{self.class_name}_decode\", left);",
+            f"{indent*2}logw_f(\"%zd bytes left\", \"{self.class_name}_decode\", left);",
             f"{indent*2}char* buffer = malloc(sizeof(char) * left);",
-            f"{indent*2}logw_f(\"read additional %d bytes\", \"{self.class_name}_decode\", stream_read(src, buffer, left));",
+            f"{indent*2}logw_f(\"read %d bytes to fix\", \"{self.class_name}_decode\", stream_read(src, buffer, left));",
             f"{indent*2}free(buffer);",
-            f"{indent}}}",
+            f"{indent}}}"
             "}"
         ]
 
