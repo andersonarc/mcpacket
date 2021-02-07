@@ -147,7 +147,7 @@ void mcp_buffer_decode(char_vector_t* this, size_t length, stream_t src);
 /**
  * @brief variable sized integer encoder and decoder
  */
-void mcp_varint_encode(uint64_t* this, stream_t dest);
-void mcp_varint_decode(uint64_t* this, stream_t src);
+void mcp_varint_encode(uint64_t this, stream_t dest);
+uint64_t mcp_varint_decode(stream_t src);
 
 #endif /* MCP_CODEC_H */

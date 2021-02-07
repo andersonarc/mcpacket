@@ -54,7 +54,7 @@ void mcp_type_Position_decode(mcp_type_Position* this, stream_t src) {
 void mcp_type_Slot_encode(mcp_type_Slot* this, stream_t dest) {
   mcp_byte_encode(&this->present, dest);
   if (this->present) {
-    mcp_varint_encode((uint64_t*) &this->item_id, dest);
+    mcp_varint_encode(this->item_id, dest);
     mcp_byte_encode((uint8_t*) &this->item_count, dest);
     if(this->nbt_data.has_value) {
       mcp_type_NbtTagCompound_encode(&this->nbt_data.value, dest);
@@ -67,7 +67,7 @@ void mcp_type_Slot_encode(mcp_type_Slot* this, stream_t dest) {
 void mcp_type_Slot_decode(mcp_type_Slot* this, stream_t src) {
   mcp_byte_decode(&this->present, src);
   if (this->present) {
-    mcp_varint_decode((uint64_t*) &this->item_id, src);
+    this->item_id = mcp_varint_decode(src);
     mcp_byte_decode((uint8_t*) &this->item_count, src);
     uint8_t tag;
     mcp_byte_decode(&tag, src);
@@ -85,14 +85,14 @@ void mcp_type_Particle_encode(mcp_type_Particle* this, stream_t dest) {
   switch(this->type) {
     case PARTICLE_BLOCK:
     case PARTICLE_FALLING_DUST:
-      mcp_varint_encode((uint64_t*) &this->block_state, dest);
+      mcp_varint_encode(this->block_state, dest);
       break;
 
     case PARTICLE_DUST:
-      mcp_be32_encode((uint32_t*) &this->red, dest);
-      mcp_be32_encode((uint32_t*) &this->green, dest);
-      mcp_be32_encode((uint32_t*) &this->blue, dest);
-      mcp_be32_encode((uint32_t*) &this->scale, dest);
+      mcp_bef32_encode(&this->red, dest);
+      mcp_bef32_encode(&this->green, dest);
+      mcp_bef32_encode(&this->blue, dest);
+      mcp_bef32_encode(&this->scale, dest);
       break;
 
     case PARTICLE_ITEM:
@@ -105,7 +105,7 @@ void mcp_type_Particle_decode(mcp_type_Particle* this, mcp_type_ParticleType p_t
   switch (this->type) {
     case PARTICLE_BLOCK:
     case PARTICLE_FALLING_DUST:
-      mcp_varint_decode((uint64_t*) &this->block_state, src);
+      this->block_state = mcp_varint_decode(src);
       break;
 
     case PARTICLE_DUST:
@@ -126,24 +126,24 @@ void mcp_type_Particle_decode(mcp_type_Particle* this, mcp_type_ParticleType p_t
  */
 void mcp_type_Smelting_encode(mcp_type_Smelting* this, stream_t dest) {
   mcp_string_encode(&this->group, dest);
-  mcp_varint_encode(&this->ingredient.size, dest);
+  mcp_varint_encode(this->ingredient.size, dest);
   for (size_t i = 0; i < this->ingredient.size; i++) {
     mcp_type_Slot_encode(&this->ingredient.data[i], dest);
   }
   mcp_type_Slot_encode(&this->result, dest);
   mcp_bef32_encode(&this->experience, dest);
-  mcp_varint_encode((uint64_t*) &this->cook_time, dest);
+  mcp_varint_encode(this->cook_time, dest);
 }
 MALLOC void mcp_type_Smelting_decode(mcp_type_Smelting* this, stream_t src) {
   mcp_string_decode(&this->group, src);
-  mcp_varint_decode(&this->ingredient.size, src);
+  this->ingredient.size = mcp_varint_decode(src);
   this->ingredient.data = malloc(this->ingredient.size * sizeof(mcp_type_Slot));
   for (size_t i = 0; i < this->ingredient.size; i++) {
     mcp_type_Slot_decode(&this->ingredient.data[i], src);
   }
   mcp_type_Slot_decode(&this->result, src);
   mcp_bef32_decode(&this->experience, src);
-  mcp_varint_decode((uint64_t*) &this->cook_time, src);
+  this->cook_time = mcp_varint_decode(src);
 }
 
 /**
@@ -151,18 +151,18 @@ MALLOC void mcp_type_Smelting_decode(mcp_type_Smelting* this, stream_t src) {
  */
 void mcp_type_Tag_encode(mcp_type_Tag* this, stream_t dest) {
   mcp_string_encode(&this->tag_name, dest);
-  mcp_varint_encode(&this->entries.size, dest);
+  mcp_varint_encode(this->entries.size, dest);
   for (size_t i = 0; i < this->entries.size; i++) {
-    mcp_varint_encode((uint64_t*) &this->entries.data[i], dest);
+    mcp_varint_encode(this->entries.data[i], dest);
   }
 }
 MALLOC void mcp_type_Tag_decode(mcp_type_Tag* this, stream_t src) { //todo deal with memory leaks (in handlers? generate code for each packet to dealloc?)
 //todo FREE function for each MALLOC function
   mcp_string_decode(&this->tag_name, src);
-  mcp_varint_decode(&this->entries.size, src);
+  this->entries.size = mcp_varint_decode(src);
   this->entries.data = malloc(this->entries.size * sizeof(int32_t));
   for (size_t i = 0; i < this->entries.size; i++) {
-    mcp_varint_decode((uint64_t*) &this->entries.data[i], src);
+    this->entries.data[i] = mcp_varint_decode(src);
   }
 }
 
@@ -503,12 +503,11 @@ void mcp_lef64_decode(double* this, stream_t src) {
  */
 void mcp_string_encode(char** this, stream_t dest) {
   size_t length = strlen(*this);
-  mcp_varint_encode((uint64_t*) &length, dest);
+  mcp_varint_encode(length, dest);
   stream_write(dest, *this, length);
 }
 MALLOC void mcp_string_decode(char** this, stream_t src) {
-  size_t length;
-  mcp_varint_decode((uint64_t*) &length, src);
+  size_t length = mcp_varint_decode(src);
   char* string = malloc(length + 1);
   stream_read(src, string, length);
   string[length] = 0;
@@ -534,23 +533,23 @@ void mcp_buffer_decode(char_vector_t* this, size_t length, stream_t src) {
 /**
  * @brief variable sized number
  */
-void mcp_varint_encode(uint64_t* this, stream_t dest) {
-  uint64_t src = *this;
+void mcp_varint_encode(uint64_t src, stream_t dest) {
   uint64_t tmp;
-  for(; src >= 0x80; src >>= 7)
+  for(; src >= 0x80; src >>= 7) {
     tmp = 0x80 | (src & 0x7F);
     stream_write(dest, &tmp, SINGLE_BYTE);
+  }
   tmp = src & 0x7F;
   stream_write(dest, &tmp, SINGLE_BYTE);
 }
-void mcp_varint_decode(uint64_t* this, stream_t src) {
+uint64_t mcp_varint_decode(stream_t src) {
   int i = 0;
   uint64_t j = 0;
-  *this = 0;
+  uint64_t dest = 0;
   stream_read(src, &j, SINGLE_BYTE);
   for(; j & 0x80; i += 7) {
     stream_read(src, &j, SINGLE_BYTE);
-    *this |= (j & 0x7F) << i;
+    dest |= (j & 0x7F) << i;
   }
-  *this |= j << i;
+  return dest | j << i;
 }

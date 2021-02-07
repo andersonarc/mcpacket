@@ -299,10 +299,10 @@ class mc_varint(numeric_type):
         return f"{variable} += size_varint({self.name});",
 
     def encoder(self):
-        return f"mcp_{self.postfix}_encode((uint64_t*) &{self.name}, dest);",
+        return f"mcp_{self.postfix}_encode({self.name}, dest);",
 
     def decoder(self):
-        return f"mcp_{self.postfix}_decode((uint64_t*) &{self.name}, src);",
+        return f"{self.name} = mcp_{self.postfix}_decode(src);",
 
 
 @mc_data_name("varlong")
@@ -1302,8 +1302,8 @@ class packet:
             f"{indent}size_t {packet_length_variable} = size_varlong(this->mcpacket.id);",
             *tmp,
             *lengths,
-            f"{indent}mcp_varint_encode((uint64_t*) &{packet_length_variable}, dest);",
-            f"{indent}mcp_varint_encode((uint64_t*) &this->mcpacket.id, dest);",
+            f"{indent}mcp_varint_encode({packet_length_variable}, dest);",
+            f"{indent}mcp_varint_encode(this->mcpacket.id, dest);",
             *fields,
             "}"
         ]
@@ -1332,11 +1332,8 @@ class packet:
     def full_decoder(self): #todo for debug only and should be removed?
         return [
             f"void {self.class_name}_decode_full({self.class_name}* this, stream_t src) {{",
-            f"{indent}size_t {packet_length_variable};",
-            f"{indent}mcp_varint_decode((uint64_t*) &{packet_length_variable}, src);"
-            f"{indent}int {packet_id_variable};"
-            f"{indent}mcp_varint_decode((uint64_t*) &{packet_id_variable}, src);"
-            f"{indent}if (this->mcpacket.id != {packet_id_variable}) {{",
+            f"{indent}size_t {packet_length_variable} = mcp_varint_decode(src);"
+            f"{indent}if (this->mcpacket.id != mcp_varint_decode(src)) {{",
             f"{indent*2}logfe(\"incoming packet id differs with local\\n\", \"{self.class_name}_decode\");",
             f"{indent}}}",
             f"{indent}{self.class_name}_decode(this, src, {packet_length_variable});",

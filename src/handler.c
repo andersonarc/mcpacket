@@ -18,11 +18,8 @@
  * @param src stream from which to read a packet
  */
 void mcp_handle_packet_global(stream_t src, mcpacket_state state, mcpacket_source source) {
-    size_t length;
-    int id;
-    mcp_varint_decode((uint64_t*) &length, src);
-    mcp_varint_decode((uint64_t*) &id, src);
-    
+    size_t length = mcp_varint_decode(src);
+    int id = mcp_varint_decode(src);
     mcpacket_handler* handler = mcp_get_packet_handler(state, source, id);
     handler(src, length);
 }
@@ -33,11 +30,8 @@ void mcp_handle_packet_global(stream_t src, mcpacket_state state, mcpacket_sourc
  * @param src stream from which to read a packet
  */
 void mcp_handle_packet(stream_t src, mcpacket_handler* handler) {
-    size_t length;
-    int id;
-    mcp_varint_decode((uint64_t*) &length, src);
-    mcp_varint_decode((uint64_t*) &id, src);
-
+    size_t length = mcp_varint_decode(src);
+    mcp_varint_decode(src);
     handler(src, length);
 }
 
