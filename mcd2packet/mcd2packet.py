@@ -18,19 +18,21 @@ mcd_type_map = {}
 type_pre_definitions = dict(
     char_vector_t="",
     int32_t_vector_t="",
-    mc_slot_vector_t="",
-    mc_tag_vector_t="",
-    mc_item_vector_t="",
+    mcp_type_Slot_vector_t="",
+    mcp_type_Tag_vector_t="",
+    mcp_type_Item_vector_t="",
     string_t_optional_t="",
-    nbt_tag_compound_optional_t="",
+    mcp_type_NbtTagCompound_optional_t="",
     int32_t_optional_t="",
-    mc_uuid_optional_t="",
-    mc_position_optional_t=""
+    mcp_type_UUID_optional_t="",
+    mcp_type_Position_optional_t=""
 )
 type_definitions = type_pre_definitions.copy()
 length_functions = dict()
 packet_length_variable = "_this_packet_length"
 packet_read_length_variable = "_this_packet_read_length"
+packet_id_variable = "_this_mcpacket_id"
+packet_tmp_variable = "_this_tmp_byte"
 
 
 def mc_data_name(typename):
@@ -112,17 +114,16 @@ class generic_type:
         return f"{self.typename} {self.name} = {val};",
 
     def encoder(self):
-        return f"enc_{self.postfix}(dest, {self.name});",
+        return f"mcp_{self.postfix}_encode(&{self.name}, dest);",
 
     def decoder(self):
-        if self.name:
-            return f"{self.name} = dec_{self.postfix}(src);",
-        # Special case for when we need to decode a variable as a parameter
-        else:
-            return f"dec_{self.postfix}(src)"
+        return f"mcp_{self.postfix}_decode(&{self.name}, src);",
 
     def dec_initialized(self):
-        return f"{self.typename} {self.name} = dec_{self.postfix}(src);",
+        return (
+            f"{self.typename} {self.name};", 
+            f"mcp_{self.postfix}_decode(&{self.name}, src);"
+        )
 
     # This comes up enough to write some dedicated functions for it
     # Conglomerate types take one of two approaches to fundamental types:
@@ -190,6 +191,12 @@ class num_u8(numeric_type):
     typename = "uint8_t"
     postfix = "byte"
 
+    def encoder(self):
+        return f"mcp_{self.postfix}_encode((uint8_t*) &{self.name}, dest);",
+
+    def decoder(self):
+        return f"mcp_{self.postfix}_decode((uint8_t*) &{self.name}, src);",
+
 
 @mc_data_name("i8")
 class num_i8(num_u8):
@@ -212,6 +219,12 @@ class num_u16(numeric_type):
 class num_i16(num_u16):
     typename = "int16_t"
 
+    def encoder(self):
+        return f"mcp_{self.postfix}_encode((uint16_t*) &{self.name}, dest);",
+
+    def decoder(self):
+        return f"mcp_{self.postfix}_decode((uint16_t*) &{self.name}, src);",
+
 
 @mc_data_name("u32")
 class num_u32(numeric_type):
@@ -224,6 +237,12 @@ class num_u32(numeric_type):
 class num_i32(num_u32):
     typename = "int32_t"
 
+    def encoder(self):
+        return f"mcp_{self.postfix}_encode((uint32_t*) &{self.name}, dest);",
+
+    def decoder(self):
+        return f"mcp_{self.postfix}_decode((uint32_t*) &{self.name}, src);",
+
 
 @mc_data_name("u64")
 class num_u64(numeric_type):
@@ -231,11 +250,15 @@ class num_u64(numeric_type):
     typename = "uint64_t"
     postfix = "be64"
 
-
 @mc_data_name("i64")
 class num_i64(num_u64):
     typename = "int64_t"
 
+    def encoder(self):
+        return f"mcp_{self.postfix}_encode((uint64_t*) &{self.name}, dest);",
+
+    def decoder(self):
+        return f"mcp_{self.postfix}_decode((uint64_t*) &{self.name}, src);",
 
 @mc_data_name("f32")
 class num_float(num_u32):
@@ -253,15 +276,15 @@ class num_double(num_u64):
 # A position is technically a bitfield but we hide that behind a utility func
 @mc_data_name("position")
 class num_position(num_u64):
-    typename = "mc_position"
-    postfix = "position"
+    typename = "mcp_type_Position"
+    postfix = "type_Position"
 
 
 @mc_data_name("UUID")
 class num_uuid(numeric_type):
     size = 16
-    typename = "mc_uuid"
-    postfix = "uuid"
+    typename = "mcp_type_UUID"
+    postfix = "type_UUID"
 
 
 @mc_data_name("varint")
@@ -274,6 +297,12 @@ class mc_varint(numeric_type):
     
     def length(self, variable):
         return f"{variable} += size_varint({self.name});",
+
+    def encoder(self):
+        return f"mcp_{self.postfix}_encode((uint64_t*) &{self.name}, dest);",
+
+    def decoder(self):
+        return f"mcp_{self.postfix}_decode((uint64_t*) &{self.name}, src);",
 
 
 @mc_data_name("varlong")
@@ -312,12 +341,15 @@ class mc_buffer(simple_type):
 
     def encoder(self):
         return (
-            f"enc_{self.count.postfix}(dest, {self.name}.size);",
-            f"enc_buffer(dest, {self.name});",
+            *self.count(f'{self.name}.size', self).encoder(),
+            f"mcp_buffer_encode(&{self.name}, dest);",
         )
 
     def decoder(self):
-        return f"{self.name} = dec_buffer(src, dec_{self.count.postfix}(src));",
+        return (
+            *self.count(f'{self.name}.size', self).decoder(),
+            f"mcp_buffer_decode(&{self.name}, {self.name}.size, src);",
+        )
 
 
 @mc_data_name("restBuffer")
@@ -340,21 +372,21 @@ class mc_rest_buffer(simple_type):
 
 @mc_data_name("nbt")
 class mc_nbt(simple_type):
-    typename = "nbt_tag_compound"
+    typename = "mcp_type_NbtTagCompound"
     
     def length(self, variable):
         return f"/* todo nbt length */",
 
     def encoder(self):
-        return f"nbt_encode_full(dest, {self.name});", 
+        return f"mcp_type_NbtTagCompound_encode(&{self.name}, dest);", 
 
     def decoder(self):
-        return f"nbt_decode_full(src, {self.name});",
+        return f"mcp_type_NbtTagCompound_decode(&{self.name}, src);",
 
 
 @mc_data_name("optionalNbt")
 class mc_optional_nbt(simple_type):
-    typename = "nbt_tag_compound_optional_t"
+    typename = "mcp_type_NbtTagCompound_optional_t"
     
     def length(self, variable):
         return f"/* todo nbt length */",
@@ -362,42 +394,42 @@ class mc_optional_nbt(simple_type):
     def encoder(self):
         return (
             f"if ({self.name}.has_value) {{",
-            f"{indent}nbt_encode_full(dest, {self.name}.value);", #todo length
+            f"{indent}mcp_type_NbtTagCompound_encode(&{self.name}.value, dest);", #todo length
             f"}} else {{",
-            f"{indent}enc_byte(dest, NBT_TAG_END);",
+            f"{indent}{packet_tmp_variable} = MCP_NBT_TAG_END;",
+            f"{indent}mcp_byte_encode(&{packet_tmp_variable}, dest);",
             "}"
         )
 
     def decoder(self):
         return (
-            "if (dec_byte(src) == NBT_TAG_COMPOUND) {",
+            f"mcp_byte_decode(&{packet_tmp_variable}, src);"
+            f"if ({packet_tmp_variable} == MCP_NBT_TAG_COMPOUND) {{",
             f"{indent}{self.name}.has_value = true;",
-            f"{indent}{self.name}.value = nbt_read_string(src);",
+            f"{indent}mcp_type_NbtTagCompound_read(&{self.name}.value, src);",
             "}"
         )
 
-
 class self_serializing_type(simple_type):
     def encoder(self):
-        return f"{self.typename}_encode(dest, &{self.name});",
+        return f"{self.typename}_encode(&{self.name}, dest);",
 
     def decoder(self):
-        return f"{self.typename}_decode(src, &{self.name});",
-
+        return f"{self.typename}_decode(&{self.name}, src);",
 
 @mc_data_name("slot")
 class mc_slot(self_serializing_type):
-    typename = "mc_slot"
+    typename = "mcp_type_Slot"
 
 
 @mc_data_name("minecraft_smelting_format")
 class mc_smelting(self_serializing_type):
-    typename = "mc_smelting"
+    typename = "mcp_type_Smelting"
 
 
 @mc_data_name("entityMetadata")
 class mc_metadata(self_serializing_type):
-    typename = "mc_entity_metadata"
+    typename = "mcp_type_EntityMetadata"
 
 
 # This is not how topBitSetTerminatedArray works, but the real solution is hard
@@ -405,19 +437,19 @@ class mc_metadata(self_serializing_type):
 # Equipment packet we're going to stick with this solution
 @mc_data_name("topBitSetTerminatedArray")
 class mc_entity_equipment(self_serializing_type):
-    typename = "mc_entity_equipment"
+    typename = "mcp_type_EntityEquipment"
 
 
 @mc_data_name("particleData")
 class mc_particle(self_serializing_type):
-    typename = "mc_particle"
+    typename = "mcp_type_Particle"
 
     def __init__(self, name, parent, type_data, use_compare=False):
         super().__init__(name, parent, type_data, use_compare)
         self.id_field = type_data["compareTo"]
 
     def decoder(self):
-        return f"{self.typename}_decode(src, &{self.name}, (mc_particle_type) this->{self.id_field});",
+        return f"{self.typename}_decode(&{self.name}, (mcp_type_ParticleType) this->{self.id_field}, src);",
 
 
 class vector_type(simple_type):
@@ -434,40 +466,40 @@ class vector_type(simple_type):
 
     def length(self, variable):
         return [
-            *self.count(f'{self.name}.size', self).length(variable),
+            *self.count(f"{self.name}.size", self).length(variable),
             f"{variable} += sizeof(*{self.name}.data) * {self.name}.size;"
         ]
 
     def encoder(self):
         iterator = f"i{self.depth}"
         return (
-            f"enc_{self.count.postfix}(dest, {self.name}.size);",
+            *self.count(f"{self.name}.size", self).encoder(),
             f"for (int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
-            f"{indent}{self.element}_encode(dest, &{self.name}.data[{iterator}]);",
+            f"{indent}{self.element}_encode(&{self.name}.data[{iterator}], dest);",
             "}",
         )
 
     def decoder(self):
         iterator = f"i{self.depth}"
         return (
-            f"{self.name}.size = dec_{self.count.postfix}(src);",
+            *self.count(f"{self.name}.size", self).decoder(),
             f"{self.name}.data = ({self.element}*) malloc({self.name}.size * sizeof({self.element}));",
             f"for (int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
-            f"{indent}{self.element}_decode(src, &{self.name}.data[{iterator}]);",
+            f"{indent}{self.element}_decode(&{self.name}.data[{iterator}], src);",
             "}"
         )
 
 
 @mc_data_name("ingredient")
 class mc_ingredient(vector_type):
-    element = "mc_slot"
-    typename = "mc_slot_vector_t"
+    element = "mcp_type_Slot"
+    typename = "mcp_type_Slot_vector_t"
 
 
 @mc_data_name("tags")
 class mc_tags(vector_type):
-    element = "mc_tag"
-    typename = "mc_tag_vector_t"
+    element = "mcp_type_Tag"
+    typename = "mcp_type_Tag_vector_t"
 
 
 @mc_data_name("option")
@@ -510,7 +542,7 @@ class mc_option(simple_type):
     def encoder(self):
         self.field.temp_name(f"{self.name}.value")
         result = (
-            f"enc_byte(dest, {self.name}.has_value);",
+            f"mcp_byte_encode((uint8_t*) &{self.name}.has_value, dest);",
             f"if ({self.name}.has_value) {{",
             *(indent + line for line in self.field.encoder()),
             "}"
@@ -519,7 +551,10 @@ class mc_option(simple_type):
         return result
 
     def decoder(self):
-        ret = [f"if (dec_byte(src)) {{"]
+        ret = [
+            f"mcp_byte_decode((uint8_t*) &{packet_tmp_variable}, src);",
+            f"if ({packet_tmp_variable} == true) {{"
+        ]
         if isinstance(self.field, numeric_type) or type(self.field) in (mc_string,
                                                                         mc_buffer, mc_rest_buffer):
             self.field.temp_name(self.name)
@@ -1036,10 +1071,10 @@ class mc_array(simple_type):
 
     def prefixed_decode(self):
         iterator = f"i{self.depth}"
-        self.count.name = ""
+        self.count.name = f"{self.name}.size"
         self.field.temp_name(f"{self.name}.data[{iterator}]")
         result = [
-            f"{self.name}.size = {self.count.decoder()};",
+            *self.count.decoder(),
             f"{self.name}.data = ({self.f_type}*) malloc({self.name}.size * sizeof({self.f_type}));",
             f"for (int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
             *(indent + l for l in self.field.decoder()),
@@ -1252,36 +1287,56 @@ class packet:
         ]
 
     def encoder(self):
+        lengths = [*(indent + l for f in self.fields for l in get_length(f))]
+        fields = [*(indent + l for f in self.fields for l in get_encoder(f))]
+        tmp = []
+        for line in lengths:
+            if packet_tmp_variable in line:
+                tmp = [f"{indent}uint8_t {packet_tmp_variable} = 0;"]
+        if len(tmp) == 0:
+            for line in fields:
+                if packet_tmp_variable in line:
+                    tmp = [f"{indent}uint8_t {packet_tmp_variable} = 0;"]
         return [
             f"void {self.class_name}_encode({self.class_name}* this, stream_t dest) {{",
             f"{indent}size_t {packet_length_variable} = size_varlong(this->mcpacket.id);",
-            *(indent + l for f in self.fields for l in get_length(f)),
-            f"{indent}enc_varint(dest, {packet_length_variable});",
-            f"{indent}enc_varint(dest, this->mcpacket.id);",
-            *(indent + l for f in self.fields for l in get_encoder(f)),
+            *tmp,
+            *lengths,
+            f"{indent}mcp_varint_encode((uint64_t*) &{packet_length_variable}, dest);",
+            f"{indent}mcp_varint_encode((uint64_t*) &this->mcpacket.id, dest);",
+            *fields,
             "}"
         ]
 
     def decoder(self):
+        fields = [*(indent + l for f in self.fields for l in get_decoder_and_length(f))]
+        tmp = []
+        for line in fields:
+            if packet_tmp_variable in line:
+                tmp = [f"{indent}uint8_t {packet_tmp_variable} = 0;"]
         return [
             f"void {self.class_name}_decode({self.class_name}* this, stream_t src, size_t {packet_length_variable}) {{",
             f"{indent}size_t {packet_read_length_variable} = size_varlong(this->mcpacket.id);",
-            *(indent + l for f in self.fields for l in get_decoder_and_length(f)),
+            *tmp,
+            *fields,
             f"{indent}if ({packet_read_length_variable} != {packet_length_variable}) {{",
-            f"{indent*2}logw(\"can't decode full packet\\n\", \"{self.class_name}_decode\");",
             f"{indent*2}size_t left = {packet_length_variable} - {packet_read_length_variable};",
-            f"{indent*2}char* clean_buffer = malloc(sizeof(char) * left);",
-            f"{indent*2}stream_read(src, clean_buffer, left);",
-            f"{indent*2}free(clean_buffer);",
+            f"{indent*2}logw_f(\"unable to decode full packet: %zd bytes left\\n\", \"{self.class_name}_decode\", left);",
+            f"{indent*2}char* buffer = malloc(sizeof(char) * left);",
+            f"{indent*2}logw_f(\"read additional %d bytes\", \"{self.class_name}_decode\", stream_read(src, buffer, left));",
+            f"{indent*2}free(buffer);",
             f"{indent}}}",
             "}"
         ]
 
-    def full_decoder(self):
+    def full_decoder(self): #todo for debug only and should be removed?
         return [
             f"void {self.class_name}_decode_full({self.class_name}* this, stream_t src) {{",
-            f"{indent}size_t {packet_length_variable} = dec_varint(src);",
-            f"{indent}if (this->mcpacket.id != dec_varint(src)) {{",
+            f"{indent}size_t {packet_length_variable};",
+            f"{indent}mcp_varint_decode((uint64_t*) &{packet_length_variable}, src);"
+            f"{indent}int {packet_id_variable};"
+            f"{indent}mcp_varint_decode((uint64_t*) &{packet_id_variable}, src);"
+            f"{indent}if (this->mcpacket.id != {packet_id_variable}) {{",
             f"{indent*2}logfe(\"incoming packet id differs with local\\n\", \"{self.class_name}_decode\");",
             f"{indent}}}",
             f"{indent}{self.class_name}_decode(this, src, {packet_length_variable});",
@@ -1335,7 +1390,7 @@ warning_impl = (
 
 warning_particle = (
     "/**",
-    " * @file particle_types.h",
+    " * @file particle.h",
     " * @author SpockBotMC",
     " * @author andersonarc (e.andersonarc@gmail.com)",
     " * @brief generated by mcd2packet minecraft particle types",
@@ -1379,11 +1434,10 @@ def run(version):
         "#ifndef MCP_PROTOCOL_H",
         "#define MCP_PROTOCOL_H",
         "",
-        "#include <stdint.h>",
+        "#include \"mcp/particle.h\"",
         "#include \"mcp/stream.h\"",
-        "#include \"mcp/particles.h\"",
         "#include \"mcp/misc.h\"",
-        "#include \"mcp/types.h\"",
+        "#include \"mcp/type.h\"",
         "#include \"mcp/nbt.h\"",
         "",
         f"#define MC_VERSION \"{version.replace('_', '.')}\"",
@@ -1412,7 +1466,7 @@ def run(version):
         "  const string_t name; ",
         "} mcpacket_t;",
         ""
-            ]
+    ]
     header_lower = [
         "extern const char** mcp_protocol_cstrings[MCP_STATE__MAX][MCP_SOURCE__MAX];",
         "extern mcpacket_handler** mcp_protocol_handlers[MCP_STATE__MAX][MCP_SOURCE__MAX]; // todo not sure that it works as expected",
@@ -1425,8 +1479,11 @@ def run(version):
         "#include <malloc.h>",
         "#include <string.h>",
         "#include \"csafe/log.h\"",
+        "#include \"csafe/logf.h\"",
         "#include \"mcp/protocol.h\"",
         "#include \"mcp/handler.h\"",
+        "#include \"mcp/varnum.h\"",
+        "#include \"mcp/codec.h\"",
         ""
     ]
     impl_lower = []
@@ -1434,14 +1491,14 @@ def run(version):
         #todo problem - decoder fails reading extra bytes?
         *warning_particle,
         f"/* MCD version {version.replace('_', '.')} */",
-        "#ifndef MCP_PARTICLES_H",
-        "#define MCP_PARTICLES_H",
+        "#ifndef MCP_PARTICLE_H",
+        "#define MCP_PARTICLE_H",
         "",
-        "typedef enum mc_particle_type {"
+        "typedef enum mcp_type_ParticleType {"
     ]
     particle_header.extend(f"{indent}PARTICLE_{x.upper()}," for x in mcd.particles_name)
     particle_header[-1] = particle_header[-1][:-1]
-    particle_header += ["} mc_particle_type;", "#endif /* MCP_PARTICLES_H */", ""]
+    particle_header += ["} mcp_type_ParticleType;", "#endif /* MCP_PARTICLE_H */", ""]
     packet_enum = {}
     packets = {}
 
@@ -1544,7 +1601,7 @@ def run(version):
     if not os.path.exists(f"{path}mcp"):
         os.mkdir(f"{path}mcp")
         
-    with open(f"{path}mcp/particles.h", "w") as f:
+    with open(f"{path}mcp/particle.h", "w") as f:
         f.write("\n".join(particle_header))
     with open(f"{path}protocol.c", "w") as f:
         f.write("\n".join(impl))

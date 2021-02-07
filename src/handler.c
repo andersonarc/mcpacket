@@ -8,6 +8,7 @@
     /* includes */
 #include "mcp/handler.h"    /* this */
 #include "mcp/protocol.h"   /* protocol */
+#include "mcp/codec.h"      /* encoders/decoders */
 //todo includes in .c
 
     /* functions */
@@ -17,8 +18,10 @@
  * @param src stream from which to read a packet
  */
 void mcp_handle_packet_global(stream_t src, mcpacket_state state, mcpacket_source source) {
-    size_t length = dec_varint(src);
-    int id = dec_varint(src);
+    size_t length;
+    int id;
+    mcp_varint_decode((uint64_t*) &length, src);
+    mcp_varint_decode((uint64_t*) &id, src);
     
     mcpacket_handler* handler = mcp_get_packet_handler(state, source, id);
     handler(src, length);
@@ -30,8 +33,11 @@ void mcp_handle_packet_global(stream_t src, mcpacket_state state, mcpacket_sourc
  * @param src stream from which to read a packet
  */
 void mcp_handle_packet(stream_t src, mcpacket_handler* handler) {
-    size_t length = dec_varint(src);
-    dec_varint(src);
+    size_t length;
+    int id;
+    mcp_varint_decode((uint64_t*) &length, src);
+    mcp_varint_decode((uint64_t*) &id, src);
+
     handler(src, length);
 }
 

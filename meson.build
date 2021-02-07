@@ -18,7 +18,7 @@ dependencies = custom_target('dependencies',
 protocol = custom_target('protocol', 
     build_by_default: true,
     input: 'mcd2packet/mcd2packet.py', 
-    output: ['protocol.c', 'protocol.h', 'particles.h'],
+    output: ['protocol.c', 'protocol.h', 'particle.h'],
     depends: [dependencies],
     command: [python, '@INPUT@'])
 
@@ -27,11 +27,12 @@ csafe = dependency('csafe',
     fallback: ['csafe', 'csafe_dep'])
 
 # prepare build files
-src = files('src/types.c', 'src/nbt.c', 'src/handler.c')
+miniz = files('src/lib/miniz.c')
+src = files('src/nbt.c', 'src/handler.c', 'src/codec.c', 'src/varnum.c')
 include = include_directories('include')
 
 # compile library
-libmcpacket = library('mcpacket', [src, protocol],
+libmcpacket = library('mcpacket', [src, protocol, miniz],
     include_directories: include,
     dependencies: [csafe],
     c_args: ['-Wno-switch'])

@@ -13,8 +13,6 @@
 /**
  * @brief nbt stub functions
  */
-void nbt_encode_full(stream_t dest, nbt_tag_compound* this) {}
-void nbt_decode_full(stream_t src, nbt_tag_compound* this) {}
-nbt_tag_compound nbt_read_string(stream_t src) {
-    return NULL;
-}
+void mcp_type_NbtTagCompound_encode(mcp_type_NbtTagCompound* this, stream_t dest) { }
+void mcp_type_NbtTagCompound_decode(mcp_type_NbtTagCompound* this, stream_t src) { }
+void mcp_type_NbtTagCompound_read(mcp_type_NbtTagCompound* this, stream_t src) { }

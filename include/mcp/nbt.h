@@ -17,34 +17,34 @@
 /**
  * @brief stub nbt tag
  */
-#define nbt_tag_compound void*
+#define mcp_type_NbtTagCompound void*
 
     /* typedefs */
 /**
  * @brief stub nbt enum
  */
-typedef enum nbt_tag_type {
-  NBT_TAG_END,
-  NBT_TAG_BYTE,
-  NBT_TAG_SHORT,
-  NBT_TAG_INT,
-  NBT_TAG_LONG,
-  NBT_TAG_FLOAT,
-  NBT_TAG_DOUBLE,
-  NBT_TAG_BYTE_ARRAY,
-  NBT_TAG_STRING,
-  NBT_TAG_LIST,
-  NBT_TAG_COMPOUND,
-  NBT_TAG_INT_ARRAY,
-  NBT_TAG_LONG_ARRAY
-} nbt_tag_type;
+typedef enum mcp_type_NbtTag {
+  MCP_NBT_TAG_END,
+  MCP_NBT_TAG_BYTE,
+  MCP_NBT_TAG_SHORT,
+  MCP_NBT_TAG_INT,
+  MCP_NBT_TAG_LONG,
+  MCP_NBT_TAG_FLOAT,
+  MCP_NBT_TAG_DOUBLE,
+  MCP_NBT_TAG_BYTE_ARRAY,
+  MCP_NBT_TAG_STRING,
+  MCP_NBT_TAG_LIST,
+  MCP_NBT_TAG_COMPOUND,
+  MCP_NBT_TAG_INT_ARRAY,
+  MCP_NBT_TAG_LONG_ARRAY
+} mcp_type_NbtTag;
 
     /* functions */
 /**
- * @brief nbt stub functions
+ * @brief nbt stub functionsq
  */
-void nbt_encode_full(stream_t dest, nbt_tag_compound* this);
-void nbt_decode_full(stream_t src, nbt_tag_compound* this);
-nbt_tag_compound nbt_read_string(stream_t src);
+void mcp_type_NbtTagCompound_encode(mcp_type_NbtTagCompound* this, stream_t dest);
+void mcp_type_NbtTagCompound_decode(mcp_type_NbtTagCompound* this, stream_t src);
+void mcp_type_NbtTagCompound_read(mcp_type_NbtTagCompound* this, stream_t src);
 
 #endif /* MCP_NBT_H */
