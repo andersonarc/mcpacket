@@ -2,7 +2,6 @@
  * @file misc.h
  * @author andersonarc (andersonarc@github.com)
  * @brief miscellanous utilities
- * @todo categorize and move all utilities into different files
  * @version 0.5
  * @date 2020-12-07
  */
@@ -48,20 +47,5 @@ typedef struct type##_vector_t { \
     type* data;  \
     size_t size; \
 } type##_vector_t;
-
-     /* functions */
-/**
- * @brief exit with error
- * 
- * @param message message string
- */
-void runtime_error(string_t message);
-
-/**
- * @brief print warning
- * 
- * @param message message string
- */
-void runtime_warning(string_t message);
 
 #endif /* MCP_MISC_H */

@@ -2,7 +2,7 @@
 
 # project definition
 project('mcpacket', 'c', 
-    version: '0.5',
+    version: '0.6',
     license: 'GPL3')
 
 # find required programs
@@ -22,14 +22,19 @@ protocol = custom_target('protocol',
     depends: [dependencies],
     command: [python, '@INPUT@'])
 
+# get dependencies
+csafe = dependency('csafe', 
+    fallback: ['csafe', 'csafe_dep'])
+
 # prepare build files
-src = files('src/types.c', 'src/misc.c', 'src/nbt.c', 'src/handler.c')
+src = files('src/types.c', 'src/nbt.c', 'src/handler.c')
 include = include_directories('include')
 
 # compile library
 libmcpacket = library('mcpacket', [src, protocol],
     include_directories: include,
-    c_args: ['-Wno-unused-variable', '-Wno-switch'])
+    dependencies: [csafe],
+    c_args: ['-Wno-switch'])
 
 # create a dependency
 libmcpacket_dep = declare_dependency(

@@ -2,7 +2,7 @@
  * @file handler.h
  * @author andersonarc (e.andersonarc@gmail.com)
  * @brief packet handler system
- * @version 0.1
+ * @version 0.3
  * @date 2021-01-29
  */
     /* header guard */
@@ -10,7 +10,6 @@
 #define MCP_HANDLER_H
 
     /* includes */
-#include <stdio.h> /* io for debug //todo csafe io */
 #include "mcp/protocol.h" /* protocol */
 
     /* typedefs */

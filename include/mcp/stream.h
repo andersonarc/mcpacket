@@ -41,6 +41,13 @@
 #define stream_read(stream, buffer, count) read(stream, buffer, count)
 
 /**
+ * @brief close a stream
+ * 
+ * @return 0 on success or -1
+ */
+#define stream_close(stream) close(stream)
+
+/**
  * @brief write a variable to a stream
  * 
  * @param stream   stream_t to write into

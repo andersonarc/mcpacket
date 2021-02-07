@@ -2,15 +2,15 @@
  * @file handler.c
  * @author andersonarc (e.andersonarc@gmail.com)
  * @brief packet handler system
- * @version 0.1
+ * @version 0.3
  * @date 2021-01-29
  */
     /* includes */
 #include "mcp/handler.h"    /* this */
 #include "mcp/protocol.h"   /* protocol */
+//todo includes in .c
 
-
-    /* functions */ // todo refactor subheaders
+    /* functions */
 /**
  * @brief read a packet from stream and handle it with *globally* specified handler
  * 
@@ -19,8 +19,9 @@
 void mcp_handle_packet_global(stream_t src, mcpacket_state state, mcpacket_source source) {
     size_t length = dec_varint(src);
     int id = dec_varint(src);
+    
     mcpacket_handler* handler = mcp_get_packet_handler(state, source, id);
-    handler(src, length - size_varint(id));
+    handler(src, length);
 }
 
 /**
@@ -30,8 +31,8 @@ void mcp_handle_packet_global(stream_t src, mcpacket_state state, mcpacket_sourc
  */
 void mcp_handle_packet(stream_t src, mcpacket_handler* handler) {
     size_t length = dec_varint(src);
-    int id = dec_varint(src);
-    handler(src, length - size_varint(id));
+    dec_varint(src);
+    handler(src, length);
 }
 
 /**
