@@ -535,14 +535,13 @@ void mcp_buffer_decode(char_vector_t* this, size_t length, stream_t src) {
  * @brief variable sized number
  */
 void mcp_varint_encode(uint64_t* this, stream_t dest) {
-  uint8_t tmp;
   uint64_t src = *this;
-  for(; src >= 0x80; src >>= 7) {
+  uint64_t tmp;
+  for(; src >= 0x80; src >>= 7)
     tmp = 0x80 | (src & 0x7F);
-    stream_write_variable(dest, tmp);
-  }
+    stream_write(dest, &tmp, SINGLE_BYTE);
   tmp = src & 0x7F;
-  stream_write_variable(dest, tmp);
+  stream_write(dest, &tmp, SINGLE_BYTE);
 }
 void mcp_varint_decode(uint64_t* this, stream_t src) {
   int i = 0;
