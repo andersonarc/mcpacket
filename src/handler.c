@@ -2,7 +2,7 @@
  * @file handler.c
  * @author andersonarc (e.andersonarc@gmail.com)
  * @brief packet handler system
- * @version 0.4
+ * @version 0.5
  * @date 2021-01-29
  */
     /* includes */
@@ -21,7 +21,7 @@ void mcp_handler_execute(stream_t stream, mcp_state_t state, mcp_source_t source
     buffer_t buffer;
     buffer_init(&buffer, length);
     mcp_handler_t* handler = mcp_handler_get(state, source, id);
-    handler(buffer, length);
+    handler(&buffer);
     buffer_deinit(&buffer);
 }
 
