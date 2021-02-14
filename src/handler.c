@@ -17,9 +17,10 @@
  */
 void mcp_handler_execute(stream_t stream, mcp_state_t state, mcp_source_t source) {
     size_t length = mcp_varint_stream_decode(stream);
-    int id = mcp_varint_stream_decode(stream);
     buffer_t buffer;
+    buffer_bind(&buffer, stream);
     buffer_init(&buffer, length);
+    int id = mcp_varint_decode(&buffer);
     mcp_handler_t* handler = mcp_handler_get(state, source, id);
     handler(&buffer);
     buffer_deinit(&buffer);

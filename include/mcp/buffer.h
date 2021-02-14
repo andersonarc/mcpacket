@@ -21,10 +21,19 @@
 typedef struct buffer_t {
     size_t size;
     size_t index;
+    stream_t stream;
     char* data;
 } buffer_t;
 
     /* functions */
+/**
+ * @brief bind a buffer to a stream
+ *
+ * @param buffer pointer to the buffer
+ * @param size   buffer size
+ */
+void buffer_bind(buffer_t* buffer, stream_t stream);
+
 /**
  * @brief initialize a buffer
  *
@@ -37,8 +46,17 @@ MALLOC void buffer_init(buffer_t* buffer, size_t size);
  * @brief deinitialize a buffer
  *
  * @param buffer pointer to the buffer
+ * 
+ * @warning it's the caller's responsibility to flush the buffer/close the stream
  */
 void buffer_deinit(buffer_t* buffer);
+
+/**
+ * @brief flush a buffer into bound stream
+ * 
+ * @param buffer the buffer
+ */
+void buffer_flush(buffer_t* buffer);
 
 /**
  * @brief write to a buffer
@@ -55,24 +73,11 @@ void buffer_write(buffer_t* buffer, void* src, size_t count);
  * @param buffer pointer to the buffer
  * @param dest   data destination
  * @param count  number of bytes to write
+ * 
+ * @todo
+ * @warning buffer overflow is possible
  */
 void buffer_read(buffer_t* buffer, void* dest, size_t count);
-
-/**
- * @brief write a buffer into a stream
- * 
- * @param buffer the buffer
- * @param stream stream destination
- */
-void buffer_to_stream(buffer_t buffer, stream_t stream);
-
-/**
- * @brief read a stream into a buffer
- * 
- * @param buffer the buffer
- * @param stream stream source
- */
-void stream_to_buffer(buffer_t buffer, stream_t stream);
 
     /* defines */
 /**

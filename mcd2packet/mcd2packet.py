@@ -1296,10 +1296,12 @@ class packet:
             f"{indent}size_t {packet_length_variable} = size_varlong(this->mcpacket.id);",
             *tmp,
             *lengths,
-            f"{indent}buffer_init(dest, {packet_length_variable} );",
-            f"{indent}mcp_varint_encode({packet_length_variable}, dest);",
+            f"{indent}buffer_init(dest, {packet_length_variable});",
+            f"{indent}mcp_varint_stream_encode({packet_length_variable}, dest->stream);",
             f"{indent}mcp_varint_encode(this->mcpacket.id, dest);",
             *fields,
+            f"{indent}buffer_flush(dest);",
+            f"{indent}buffer_deinit(dest);",
             "}"
         ]
 

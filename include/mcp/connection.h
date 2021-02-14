@@ -27,7 +27,7 @@ typedef struct mcp_server_info_t {
  */
 typedef struct mcp_server_t {
     mcp_server_info_t info;
-    stream_t stream;
+    buffer_t buffer;
 } mcp_server_t;
 
 /**
