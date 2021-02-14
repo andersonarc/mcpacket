@@ -46,27 +46,13 @@ typedef struct mcp_generic_packet {
  * 
  * @param src stream from which to read a packet
  */
-void mcp_handle_packet_global(stream_t src, mcpacket_state state, mcpacket_source source);
+void mcp_handle_packet(stream_t src, mcpacket_state state, mcpacket_source source);
 
 /**
- * @brief read a packet from stream and handle it with specified handler
- * 
- * @param src stream from which to read a packet
- */
-void mcp_handle_packet(stream_t src, mcpacket_handler* handler);
-
-/**
- * @brief default packet handler
+ * @brief blank packet handler
  * 
  * @param packet incoming packet
  */
-void mcp_blank_handler(stream_t src, size_t length);
-
-/**
- * @brief packet handler for debugging
- * 
- * @param packet incoming packet
- */
-void mcp_debug_handler(stream_t src, size_t length);
+void mcp_blank_handler(buffer_t src, size_t length);
 
 #endif /* MCP_HANDLER_H */

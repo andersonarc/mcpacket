@@ -30,7 +30,6 @@ type_pre_definitions = dict(
 type_definitions = type_pre_definitions.copy()
 length_functions = dict()
 packet_length_variable = "_this_packet_length"
-packet_read_length_variable = "_this_packet_read_length"
 packet_id_variable = "_this_mcpacket_id"
 packet_tmp_variable = "_this_tmp_byte"
 
@@ -361,12 +360,12 @@ class mc_rest_buffer(simple_type):
         return f"{variable} += (sizeof(*{self.name}.data) * {self.name}.size);",
 
     def encoder(self):
-        return f"stream_write(dest, {self.name}.data, {self.name}.size);",
+        return f"buffer_write(dest, {self.name}.data, {self.name}.size);",
 
     def decoder(self):
         return (
-            f"{self.name}.size = {packet_length_variable} - {packet_read_length_variable};",
-            f"stream_read(src, {self.name}.data, {self.name}.size);",
+            f"{self.name}.size = src.size - src.index;",
+            f"buffer_read(src, {self.name}.data, {self.name}.size);",
         )
 
 
@@ -1235,19 +1234,15 @@ def get_length(field):
     field.reset_name()
     return string
 
-def get_decoder_and_length(field):
-    field.temp_name("this->" + field.name) 
-    result = [
-        *field.decoder(),
-        *field.length(packet_read_length_variable)
-    ]
-    field.reset_name()
-    return result
-
-
 def get_encoder(field):
     field.temp_name("this->" + field.name)
     string = field.encoder()
+    field.reset_name()
+    return string
+
+def get_decoder(field):
+    field.temp_name("this->" + field.name)
+    string = field.decoder()
     field.reset_name()
     return string
 
@@ -1281,9 +1276,8 @@ class packet:
             f"}} {self.class_name};",
             f"void {self.class_name}_init({self.class_name}* this);",
             f"void {self.class_name}_init_full({self.class_name}* this{self.parameters()});",
-            f"void {self.class_name}_encode({self.class_name}* this, stream_t dest);", 
-            f"void {self.class_name}_decode({self.class_name}* this, stream_t src, size_t {packet_length_variable});",
-            f"void {self.class_name}_decode_full({self.class_name}* this, stream_t src);",
+            f"void {self.class_name}_encode({self.class_name}* this, buffer_t dest);", 
+            f"void {self.class_name}_decode({self.class_name}* this, buffer_t src);",
         ]
 
     def encoder(self):
@@ -1298,10 +1292,11 @@ class packet:
                 if packet_tmp_variable in line:
                     tmp = [f"{indent}uint8_t {packet_tmp_variable} = 0;"]
         return [
-            f"void {self.class_name}_encode({self.class_name}* this, stream_t dest) {{",
+            f"void {self.class_name}_encode({self.class_name}* this, buffer_t dest) {{",
             f"{indent}size_t {packet_length_variable} = size_varlong(this->mcpacket.id);",
             *tmp,
             *lengths,
+            f"{indent}buffer_init(&dest, {packet_length_variable} );",
             f"{indent}mcp_varint_encode({packet_length_variable}, dest);",
             f"{indent}mcp_varint_encode(this->mcpacket.id, dest);",
             *fields,
@@ -1309,36 +1304,15 @@ class packet:
         ]
 
     def decoder(self):
-        fields = [*(indent + l for f in self.fields for l in get_decoder_and_length(f))]
+        fields = [*(indent + l for f in self.fields for l in get_decoder(f))]
         tmp = []
         for line in fields:
             if packet_tmp_variable in line:
                 tmp = [f"{indent}uint8_t {packet_tmp_variable} = 0;"]
         return [
-            f"void {self.class_name}_decode({self.class_name}* this, stream_t src, size_t {packet_length_variable}) {{",
-            f"{indent}size_t {packet_read_length_variable} = size_varlong(this->mcpacket.id);",
+            f"void {self.class_name}_decode({self.class_name}* this, buffer_t src) {{",
             *tmp,
             *fields,
-            f"{indent}if ({packet_read_length_variable} > {packet_length_variable}) {{",
-            f"{indent*2}logw_f(\"read %zd extra bytes\", \"{self.class_name}_decode\", {packet_read_length_variable} - {packet_length_variable});",
-            f"{indent}}} else if ({packet_read_length_variable} < {packet_length_variable}) {{",
-            f"{indent*2}size_t left = {packet_length_variable} - {packet_read_length_variable};",
-            f"{indent*2}logw_f(\"%zd bytes left\", \"{self.class_name}_decode\", left);",
-            f"{indent*2}char* buffer = malloc(sizeof(char) * left);",
-            f"{indent*2}logw_f(\"read %d bytes to fix\", \"{self.class_name}_decode\", stream_read(src, buffer, left));",
-            f"{indent*2}free(buffer);",
-            f"{indent}}}"
-            "}"
-        ]
-
-    def full_decoder(self): #todo for debug only and should be removed?
-        return [
-            f"void {self.class_name}_decode_full({self.class_name}* this, stream_t src) {{",
-            f"{indent}size_t {packet_length_variable} = mcp_varint_decode(src);"
-            f"{indent}if (this->mcpacket.id != mcp_varint_decode(src)) {{",
-            f"{indent*2}logfe(\"incoming packet id differs with local\\n\", \"{self.class_name}_decode\");",
-            f"{indent}}}",
-            f"{indent}{self.class_name}_decode(this, src, {packet_length_variable});",
             "}"
         ]
 
@@ -1434,7 +1408,7 @@ def run(version):
         "#define MCP_PROTOCOL_H",
         "",
         "#include \"mcp/particle.h\"",
-        "#include \"mcp/stream.h\"",
+        "#include \"mcp/buffer.h\"",
         "#include \"mcp/misc.h\"",
         "#include \"mcp/type.h\"",
         "#include \"mcp/nbt.h\"",
@@ -1442,7 +1416,7 @@ def run(version):
         f"#define MC_VERSION \"{version.replace('_', '.')}\"",
         f"#define MC_PROTOCOL_VERSION {mcd.version['version']}",
         "",
-        "typedef void mcpacket_handler(stream_t src, size_t length);",
+        "typedef void mcpacket_handler(buffer_t src, size_t length);",
         "",
         "typedef enum mcpacket_source {",
         "  MCP_SOURCE_CLIENT,",
@@ -1523,7 +1497,6 @@ def run(version):
 
                 impl_lower += pak.encoder()
                 impl_lower += pak.decoder()
-                impl_lower += pak.full_decoder()
                 impl_lower += pak.constructor()
                 impl_lower += pak.full_constructor()
                 impl_lower.append("")

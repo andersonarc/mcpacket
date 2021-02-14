@@ -11,7 +11,7 @@
 #define MCP_NBT_H
 
     /* includes */
-#include "mcp/stream.h" /* stream io */
+#include "mcp/buffer.h" /* buffered io */
 
     /* defines */
 /**
@@ -43,8 +43,8 @@ typedef enum mcp_type_NbtTag {
 /**
  * @brief nbt stub functionsq
  */
-void mcp_type_NbtTagCompound_encode(mcp_type_NbtTagCompound* this, stream_t dest);
-void mcp_type_NbtTagCompound_decode(mcp_type_NbtTagCompound* this, stream_t src);
-void mcp_type_NbtTagCompound_read(mcp_type_NbtTagCompound* this, stream_t src);
+void mcp_type_NbtTagCompound_encode(mcp_type_NbtTagCompound* this, buffer_t dest);
+void mcp_type_NbtTagCompound_decode(mcp_type_NbtTagCompound* this, buffer_t src);
+void mcp_type_NbtTagCompound_read(mcp_type_NbtTagCompound* this, buffer_t src);
 
 #endif /* MCP_NBT_H */

@@ -12,40 +12,50 @@
     /* includes */
 #include <unistd.h> /* actual io */
 
-    /* defines */
+    /* typedefs */
 /**
  * @brief stream data type (file descriptor)
  */
-#define stream_t int
+typedef int stream_t;
+
+    /* defines */
+/**
+ * @brief initialize a stream
+ * 
+ * @param stream pointer to the stream
+ */
+#define stream_init(stream)
+
+/**
+ * @brief deinitialize a stream
+ * 
+ * @param stream pointer to the stream
+ * 
+ * @return 0 on success or -1
+ */
+#define stream_deinit(stream) close(stream)
 
 /**
  * @brief write to a stream
  * 
- * @param stream stream_t to write into
- * @param buffer buffer to read from
+ * @param stream the stream
+ * @param src    data source
  * @param count  number of bytes to write
  * 
  * @return number of bytes written or -1
  */
-#define stream_write(stream, buffer, count) write(stream, buffer, count)
+#define stream_write(stream, src, count) write(stream, src, count)
 
 /**
  * @brief read from a stream
  * 
- * @param stream stream_t to read from
- * @param buffer buffer to write into
+ * @param stream the stream
+ * @param dest   data destination
  * @param count  number of bytes to read
  * 
  * @return number of bytes read or -1
  */
-#define stream_read(stream, buffer, count) read(stream, buffer, count)
-
-/**
- * @brief close a stream
- * 
- * @return 0 on success or -1
- */
-#define stream_close(stream) close(stream)
+#define stream_read(stream, dest, count) read(stream, dest, count)
 
 /**
  * @brief write a variable to a stream
@@ -58,7 +68,7 @@
  * 
  * @return number of bytes written or -1
  */
-#define stream_write_variable(stream, variable) write(stream, &(variable), sizeof(variable))
+#define stream_write_variable(stream, variable) stream_write(stream, &(variable), sizeof(variable))
 
 /**
  * @brief read a variable from a stream
@@ -71,6 +81,6 @@
  * 
  * @return number of bytes read or -1
  */
-#define stream_read_variable(stream, variable) read(stream, &(variable), sizeof(variable))
+#define stream_read_variable(stream, variable) stream_read(stream, &(variable), sizeof(variable))
 
 #endif /* MCP_STREAM_H */

@@ -17,11 +17,11 @@
 /**
  * @brief minecraft uuid
  */
-void mcp_type_UUID_encode(mcp_type_UUID* this, stream_t dest) {
+void mcp_type_UUID_encode(mcp_type_UUID* this, buffer_t dest) {
   mcp_be64_encode(&this->msb, dest);
   mcp_be64_encode(&this->lsb, dest);
 }
-void mcp_type_UUID_decode(mcp_type_UUID* this, stream_t src) {
+void mcp_type_UUID_decode(mcp_type_UUID* this, buffer_t src) {
   mcp_be64_decode(&this->msb, src);
   mcp_be64_decode(&this->lsb, src);
 }
@@ -29,7 +29,7 @@ void mcp_type_UUID_decode(mcp_type_UUID* this, stream_t src) {
 /**
  * @brief minecraft position
  */
-void mcp_type_Position_encode(mcp_type_Position* this, stream_t dest) {
+void mcp_type_Position_encode(mcp_type_Position* this, buffer_t dest) {
   uint64_t tmp = (
     ((uint64_t) this->x & 0x3FFFFFFUL) << 38 |
     ((uint64_t) this->z & 0x3FFFFFFUL) << 12 |
@@ -37,7 +37,7 @@ void mcp_type_Position_encode(mcp_type_Position* this, stream_t dest) {
   );
   mcp_be64_encode(&tmp, dest);
 }
-void mcp_type_Position_decode(mcp_type_Position* this, stream_t src) {
+void mcp_type_Position_decode(mcp_type_Position* this, buffer_t src) {
   uint64_t tmp;
   mcp_be64_decode(&tmp, src);
   if((this->x = tmp >> 38) & (1UL << 25))
@@ -51,7 +51,7 @@ void mcp_type_Position_decode(mcp_type_Position* this, stream_t src) {
 /**
  * @brief minecraft container slot
  */
-void mcp_type_Slot_encode(mcp_type_Slot* this, stream_t dest) {
+void mcp_type_Slot_encode(mcp_type_Slot* this, buffer_t dest) {
   mcp_byte_encode(&this->present, dest);
   if (this->present) {
     mcp_varint_encode(this->item_id, dest);
@@ -64,7 +64,7 @@ void mcp_type_Slot_encode(mcp_type_Slot* this, stream_t dest) {
     }
   }
 }
-void mcp_type_Slot_decode(mcp_type_Slot* this, stream_t src) {
+void mcp_type_Slot_decode(mcp_type_Slot* this, buffer_t src) {
   mcp_byte_decode(&this->present, src);
   if (this->present) {
     this->item_id = mcp_varint_decode(src);
@@ -81,7 +81,7 @@ void mcp_type_Slot_decode(mcp_type_Slot* this, stream_t src) {
 /**
  * @brief minecraft particle
  */
-void mcp_type_Particle_encode(mcp_type_Particle* this, stream_t dest) {
+void mcp_type_Particle_encode(mcp_type_Particle* this, buffer_t dest) {
   switch(this->type) {
     case PARTICLE_BLOCK:
     case PARTICLE_FALLING_DUST:
@@ -100,7 +100,7 @@ void mcp_type_Particle_encode(mcp_type_Particle* this, stream_t dest) {
       break;
   }
 }
-void mcp_type_Particle_decode(mcp_type_Particle* this, mcp_type_ParticleType p_type, stream_t src) {
+void mcp_type_Particle_decode(mcp_type_Particle* this, mcp_type_ParticleType p_type, buffer_t src) {
   this->type = p_type;
   switch (this->type) {
     case PARTICLE_BLOCK:
@@ -124,7 +124,7 @@ void mcp_type_Particle_decode(mcp_type_Particle* this, mcp_type_ParticleType p_t
 /**
  * @brief minecraft item smelting
  */
-void mcp_type_Smelting_encode(mcp_type_Smelting* this, stream_t dest) {
+void mcp_type_Smelting_encode(mcp_type_Smelting* this, buffer_t dest) {
   mcp_string_encode(&this->group, dest);
   mcp_varint_encode(this->ingredient.size, dest);
   for (size_t i = 0; i < this->ingredient.size; i++) {
@@ -134,7 +134,7 @@ void mcp_type_Smelting_encode(mcp_type_Smelting* this, stream_t dest) {
   mcp_bef32_encode(&this->experience, dest);
   mcp_varint_encode(this->cook_time, dest);
 }
-MALLOC void mcp_type_Smelting_decode(mcp_type_Smelting* this, stream_t src) {
+MALLOC void mcp_type_Smelting_decode(mcp_type_Smelting* this, buffer_t src) {
   mcp_string_decode(&this->group, src);
   this->ingredient.size = mcp_varint_decode(src);
   this->ingredient.data = malloc(this->ingredient.size * sizeof(mcp_type_Slot));
@@ -149,14 +149,14 @@ MALLOC void mcp_type_Smelting_decode(mcp_type_Smelting* this, stream_t src) {
 /**
  * @brief minecraft tag
  */
-void mcp_type_Tag_encode(mcp_type_Tag* this, stream_t dest) {
+void mcp_type_Tag_encode(mcp_type_Tag* this, buffer_t dest) {
   mcp_string_encode(&this->tag_name, dest);
   mcp_varint_encode(this->entries.size, dest);
   for (size_t i = 0; i < this->entries.size; i++) {
     mcp_varint_encode(this->entries.data[i], dest);
   }
 }
-MALLOC void mcp_type_Tag_decode(mcp_type_Tag* this, stream_t src) { //todo deal with memory leaks (in handlers? generate code for each packet to dealloc?)
+MALLOC void mcp_type_Tag_decode(mcp_type_Tag* this, buffer_t src) { //todo deal with memory leaks (in handlers? generate code for each packet to dealloc?)
 //todo FREE function for each MALLOC function
   mcp_string_decode(&this->tag_name, src);
   this->entries.size = mcp_varint_decode(src);
@@ -169,7 +169,7 @@ MALLOC void mcp_type_Tag_decode(mcp_type_Tag* this, stream_t src) { //todo deal 
 /**
  * @brief minecraft entity equipment
  */
-void mcp_type_EntityEquipment_encode(mcp_type_EntityEquipment* this, stream_t dest) {
+void mcp_type_EntityEquipment_encode(mcp_type_EntityEquipment* this, buffer_t dest) {
   for (size_t i = 0; i < (this->equipments.size - 1); i++) {
     uint8_t tmp = (0x80 | this->equipments.data[i].slot);
     mcp_byte_encode(&tmp, dest);
@@ -178,7 +178,7 @@ void mcp_type_EntityEquipment_encode(mcp_type_EntityEquipment* this, stream_t de
   mcp_byte_encode((uint8_t*) &this->equipments.data[this->equipments.size - 1].slot, dest);
   mcp_type_Slot_encode(&this->equipments.data[this->equipments.size - 1].item, dest);
 }
-void mcp_type_EntityEquipment_decode(mcp_type_EntityEquipment* this, stream_t src) {
+void mcp_type_EntityEquipment_decode(mcp_type_EntityEquipment* this, buffer_t src) {
   //todo VLA
   this->equipments.size = 0;
   this->equipments.data = NULL;
@@ -195,7 +195,7 @@ void mcp_type_EntityEquipment_decode(mcp_type_EntityEquipment* this, stream_t sr
 /**
  * @brief minecraft entity metadata
  */
-void mcp_type_EntityMetadata_encode(mcp_type_EntityMetadata* this, stream_t dest) {
+void mcp_type_EntityMetadata_encode(mcp_type_EntityMetadata* this, buffer_t dest) {
   //todo nbt
 
   /*for(auto &el : data) {
@@ -271,7 +271,7 @@ void mcp_type_EntityMetadata_encode(mcp_type_EntityMetadata* this, stream_t dest
   }
   enc_byte(dest, 0xFF);*/
 }
-void mcp_type_EntityMetadata_decode(mcp_type_EntityMetadata* this, stream_t src) {
+void mcp_type_EntityMetadata_decode(mcp_type_EntityMetadata* this, buffer_t src) {
   this->data = NULL;
   /*data.clear();
   uint8_t index = dec_byte(src);
@@ -360,156 +360,156 @@ void mcp_type_EntityMetadata_decode(mcp_type_EntityMetadata* this, stream_t src)
 /**
  * @brief byte
  */
-void mcp_byte_encode(uint8_t* this, stream_t dest) {
-  stream_write(dest, this, SINGLE_BYTE);
+void mcp_byte_encode(uint8_t* this, buffer_t dest) {
+  buffer_write(dest, this, SINGLE_BYTE);
 }
-void mcp_byte_decode(uint8_t* this, stream_t src) {
-  stream_read(src, this, SINGLE_BYTE);
+void mcp_byte_decode(uint8_t* this, buffer_t src) {
+  buffer_read(src, this, SINGLE_BYTE);
 }
 
 /**
  * @brief big endian uint16
  */
-void mcp_be16_encode(uint16_t* this, stream_t dest) {
+void mcp_be16_encode(uint16_t* this, buffer_t dest) {
   uint16_t tmp = htobe16(*this);
-  stream_write_variable(dest, tmp);
+  buffer_write_variable(dest, tmp);
 }
-void mcp_be16_decode(uint16_t* this, stream_t src) {
+void mcp_be16_decode(uint16_t* this, buffer_t src) {
   uint16_t tmp;
-  stream_read_variable(src, tmp);
+  buffer_read_variable(src, tmp);
   *this = be16toh(tmp);
 }
 
 /**
  * @brief little endian uint16
  */
-void mcp_le16_encode(uint16_t* this, stream_t dest) {
+void mcp_le16_encode(uint16_t* this, buffer_t dest) {
   uint16_t tmp = htole16(*this);
-  stream_write_variable(dest, tmp);
+  buffer_write_variable(dest, tmp);
 }
-void mcp_le16_decode(uint16_t* this, stream_t src) {
+void mcp_le16_decode(uint16_t* this, buffer_t src) {
   uint16_t tmp;
-  stream_read_variable(src, tmp);
+  buffer_read_variable(src, tmp);
   *this = le16toh(tmp);
 }
 
 /**
  * @brief big endian uint32
  */
-void mcp_be32_encode(uint32_t* this, stream_t dest) {
+void mcp_be32_encode(uint32_t* this, buffer_t dest) {
   uint32_t tmp = htobe32(*this);
-  stream_write_variable(dest, tmp);
+  buffer_write_variable(dest, tmp);
 }
-void mcp_be32_decode(uint32_t* this, stream_t src) {
+void mcp_be32_decode(uint32_t* this, buffer_t src) {
   uint32_t tmp;
-  stream_read_variable(src, tmp);
+  buffer_read_variable(src, tmp);
   *this = be32toh(tmp);
 }
 
 /**
  * @brief little endian uint32
  */
-void mcp_le32_encode(uint32_t* this, stream_t dest) {
+void mcp_le32_encode(uint32_t* this, buffer_t dest) {
   uint32_t tmp = htole32(*this);
-  stream_write_variable(dest, tmp);
+  buffer_write_variable(dest, tmp);
 }
-void mcp_le32_decode(uint32_t* this, stream_t src) {
+void mcp_le32_decode(uint32_t* this, buffer_t src) {
   uint32_t tmp;
-  stream_read_variable(src, tmp);
+  buffer_read_variable(src, tmp);
   *this = le32toh(tmp);
 }
 
 /**
  * @brief big endian uint64
  */
-void mcp_be64_encode(uint64_t* this, stream_t dest) {
+void mcp_be64_encode(uint64_t* this, buffer_t dest) {
   uint64_t tmp = htobe64(*this);
-  stream_write_variable(dest, tmp);
+  buffer_write_variable(dest, tmp);
 }
-void mcp_be64_decode(uint64_t* this, stream_t src) {
+void mcp_be64_decode(uint64_t* this, buffer_t src) {
   uint64_t tmp;
-  stream_read_variable(src, tmp);
+  buffer_read_variable(src, tmp);
   *this = be64toh(tmp);
 }
 
 /**
  * @brief little endian uint64
  */
-void mcp_le64_encode(uint64_t* this, stream_t dest) {
+void mcp_le64_encode(uint64_t* this, buffer_t dest) {
   uint64_t tmp = htole64(*this);
-  stream_write_variable(dest, tmp);
+  buffer_write_variable(dest, tmp);
 }
-void mcp_le64_decode(uint64_t* this, stream_t src) {
+void mcp_le64_decode(uint64_t* this, buffer_t src) {
   uint64_t tmp;
-  stream_read_variable(src, tmp);
+  buffer_read_variable(src, tmp);
   *this = le64toh(tmp);
 }
 
 /**
  * @brief big endian float32
  */
-void mcp_bef32_encode(float* this, stream_t dest) {
+void mcp_bef32_encode(float* this, buffer_t dest) {
   uint32_t tmp = htobe32((uint32_t) *this);
-  stream_write_variable(dest, tmp);
+  buffer_write_variable(dest, tmp);
 }
-void mcp_bef32_decode(float* this, stream_t src) {
+void mcp_bef32_decode(float* this, buffer_t src) {
   uint32_t tmp;
-  stream_read_variable(src, tmp);
+  buffer_read_variable(src, tmp);
   *this = (float) be32toh(tmp);
 }
 
 /**
  * @brief little endian float32
  */
-void mcp_lef32_encode(float* this, stream_t dest) {
+void mcp_lef32_encode(float* this, buffer_t dest) {
   uint32_t tmp = htole32((uint32_t) *this);
-  stream_write_variable(dest, tmp);
+  buffer_write_variable(dest, tmp);
 }
 
-void mcp_lef32_decode(float* this, stream_t src) {
+void mcp_lef32_decode(float* this, buffer_t src) {
   uint32_t tmp;
-  stream_read_variable(src, tmp);
+  buffer_read_variable(src, tmp);
   *this = (float) le32toh(tmp);
 }
 
 /**
  * @brief big endian float64
  */
-void mcp_bef64_encode(double* this, stream_t dest) {
+void mcp_bef64_encode(double* this, buffer_t dest) {
   uint64_t tmp = htobe64((uint64_t) *this);
-  stream_write_variable(dest, tmp);
+  buffer_write_variable(dest, tmp);
 }
-void mcp_bef64_decode(double* this, stream_t src) {
+void mcp_bef64_decode(double* this, buffer_t src) {
   uint64_t tmp;
-  stream_read_variable(src, tmp);
+  buffer_read_variable(src, tmp);
   *this = (double) be64toh(tmp);
 }
 
 /**
  * @brief little endian float64
  */
-void mcp_lef64_encode(double* this, stream_t dest) {
+void mcp_lef64_encode(double* this, buffer_t dest) {
   uint64_t tmp = htole64((uint64_t) *this);
-  stream_write_variable(dest, tmp);
+  buffer_write_variable(dest, tmp);
 }
-void mcp_lef64_decode(double* this, stream_t src) {
+void mcp_lef64_decode(double* this, buffer_t src) {
   uint64_t tmp;
-  stream_read_variable(src, tmp);
+  buffer_read_variable(src, tmp);
   *this = (double) le64toh(tmp);
 }
 
 /**
  * @brief string
  */
-void mcp_string_encode(char** this, stream_t dest) {
+void mcp_string_encode(char** this, buffer_t dest) {
   size_t length = strlen(*this);
   mcp_varint_encode(length, dest);
-  stream_write(dest, *this, length);
+  buffer_write(dest, *this, length);
 }
-MALLOC void mcp_string_decode(char** this, stream_t src) {
+MALLOC void mcp_string_decode(char** this, buffer_t src) {
   size_t length = mcp_varint_decode(src);
   char* string = malloc(length + 1);
-  stream_read(src, string, length);
+  buffer_read(src, string, length);
   string[length] = 0;
   *this = string;
 }
@@ -521,19 +521,43 @@ size_t size_string(const char* src) {
 /**
  * @brief buffer
  */
-void mcp_buffer_encode(char_vector_t* this, stream_t dest) {
-  stream_write(dest, this->data, this->size);
+void mcp_buffer_encode(char_vector_t* this, buffer_t dest) {
+  buffer_write(dest, this->data, this->size);
 }
-void mcp_buffer_decode(char_vector_t* this, size_t length, stream_t src) {
+void mcp_buffer_decode(char_vector_t* this, size_t length, buffer_t src) {
   this->size = length;
   this->data = malloc(sizeof(char) * length);
-  stream_read(src, this->data, this->size);
+  buffer_read(src, this->data, this->size);
 }
 
 /**
  * @brief variable sized number
  */
-void mcp_varint_encode(uint64_t src, stream_t dest) {
+void mcp_varint_encode(uint64_t src, buffer_t dest) {
+  uint64_t tmp;
+  for(; src >= 0x80; src >>= 7) {
+    tmp = 0x80 | (src & 0x7F);
+    buffer_write(dest, &tmp, SINGLE_BYTE);
+  }
+  tmp = src & 0x7F;
+  buffer_write(dest, &tmp, SINGLE_BYTE);
+}
+uint64_t mcp_varint_decode(buffer_t src) {
+  int i = 0;
+  uint64_t j = 0;
+  uint64_t dest = 0;
+  buffer_read(src, &j, SINGLE_BYTE);
+  for(; j & 0x80; i += 7) {
+    buffer_read(src, &j, SINGLE_BYTE);
+    dest |= (j & 0x7F) << i;
+  }
+  return dest | j << i;
+}
+
+/**
+ * @brief variable sized number (from stream)
+ */
+void mcp_varint_stream_encode(uint64_t src, stream_t dest) {
   uint64_t tmp;
   for(; src >= 0x80; src >>= 7) {
     tmp = 0x80 | (src & 0x7F);
@@ -542,7 +566,7 @@ void mcp_varint_encode(uint64_t src, stream_t dest) {
   tmp = src & 0x7F;
   stream_write(dest, &tmp, SINGLE_BYTE);
 }
-uint64_t mcp_varint_decode(stream_t src) {
+uint64_t mcp_varint_stream_decode(stream_t src) {
   int i = 0;
   uint64_t j = 0;
   uint64_t dest = 0;
