@@ -28,7 +28,7 @@ csafe = dependency('csafe',
 
 # prepare build files
 miniz = files('src/lib/miniz.c')
-src = files('src/nbt.c', 'src/handler.c', 'src/codec.c', 'src/buffer.c', 'src/varnum.c')
+src = files('src/handler.c', 'src/codec.c', 'src/buffer.c', 'src/varnum.c')
 include = include_directories('include')
 
 # compile library

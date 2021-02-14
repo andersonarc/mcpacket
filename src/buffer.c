@@ -7,7 +7,8 @@
  */
     /* includes */
 #include "mcp/buffer.h" /* this */
-#include "memory.h"     /* memory functions */
+#include <memory.h>     /* memory functions  */
+#include <malloc.h>     /* memore allocation */
 
 /**
  * @brief initialize a buffer
@@ -33,32 +34,32 @@ void buffer_deinit(buffer_t* buffer) {
 /**
  * @brief write to a buffer
  * 
- * @param buffer the buffer
+ * @param buffer pointer to the buffer
  * @param src    data source
  * @param count  number of bytes to write
  */
-void buffer_write(buffer_t buffer, void* src, size_t count) {
-    memcpy(&buffer.data[buffer.index], src, count);
-    buffer.index += count;
+void buffer_write(buffer_t* buffer, void* src, size_t count) {
+    memcpy(&buffer->data[buffer->index], src, count);
+    buffer->index += count;
 }
 
 /**
  * @brief read from a buffer
  * 
- * @param buffer the buffer
+ * @param buffer pointer to the buffer
  * @param dest   data destination
  * @param count  number of bytes to write
  */
-void buffer_read(buffer_t buffer, void* dest, size_t count) {
-    memcpy(dest, &buffer.data[buffer.index], count);
-    buffer.index += count;
+void buffer_read(buffer_t* buffer, void* dest, size_t count) {
+    memcpy(dest, &buffer->data[buffer->index], count);
+    buffer->index += count;
 }
 
 /**
  * @brief write a buffer into a stream
  * 
  * @param buffer the buffer
- * @param dest   stream destination
+ * @param stream stream destination
  */
 void buffer_to_stream(buffer_t buffer, stream_t stream) {
     stream_write(stream, buffer.data, buffer.size);
@@ -68,8 +69,8 @@ void buffer_to_stream(buffer_t buffer, stream_t stream) {
  * @brief read a stream into a buffer
  * 
  * @param buffer the buffer
- * @param src    stream source
+ * @param stream stream source
  */
-void stream_to_buffer(stream_t stream, buffer_t buffer) {
+void stream_to_buffer(buffer_t buffer, stream_t stream) {
     stream_read(stream, buffer.data, buffer.size);
 }

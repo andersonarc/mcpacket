@@ -1,7 +1,7 @@
 /**
  * @file stream.h
  * @author andersonarc (e.andersonarc@gmail.com)
- * @brief abstract stream io
+ * @brief stream io
  * @version 0.1
  * @date 2021-01-10
  */
@@ -10,7 +10,7 @@
 #define MCP_STREAM_H
 
     /* includes */
-#include <unistd.h> /* actual io */
+#include <unistd.h> /* socket io */
 
     /* typedefs */
 /**

@@ -1,10 +1,14 @@
 /**
- * @file io.h
+ * @file connection.h
  * @author andersonarc (e.andersonarc@gmail.com)
- * @brief packet input/output system
+ * @brief connection structures
  * @version 0.1
  * @date 2021-02-07
  */
+    /* header guard */
+#ifndef MCP_CONNECTION_H
+#define MCP_CONNECTION_H
+
     /* includes */
 #include <stdint.h>       /* integer types */
 #include "mcp/protocol.h" /* protocol */
@@ -23,9 +27,8 @@ typedef struct mcp_server_t {
  */
 typedef struct mcp_context_t {
     mcp_server_t server;
-    mcpacket_state state;
+    mcp_state_t state;
     const string_t username; 
-} mcpacket_t;
+} mcp_context_t;
 
-    /* defines */
-#define write(packet) 
+#endif /* MCP_CONNECTION_H */

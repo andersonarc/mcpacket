@@ -1,8 +1,8 @@
 /**
- * @file stream.h
+ * @file buffer.h
  * @author andersonarc (e.andersonarc@gmail.com)
  * @brief buffered io
- * @version 0.1
+ * @version 0.2
  * @date 2021-02-08
  */
     /* header guard */
@@ -12,7 +12,7 @@
     /* includes */
 #include <stddef.h>     /* size_t */
 #include "mcp/stream.h" /* stream io */
-#include "mcp/misc.h"   /* miscellanous */
+#include "mcp/misc.h"   /* MALLOC */
 
     /* typedefs */
 /**
@@ -43,28 +43,36 @@ void buffer_deinit(buffer_t* buffer);
 /**
  * @brief write to a buffer
  * 
- * @param buffer the buffer
+ * @param buffer pointer to the buffer
  * @param src    data source
  * @param count  number of bytes to write
  */
-void buffer_write(buffer_t buffer, void* src, size_t count);
+void buffer_write(buffer_t* buffer, void* src, size_t count);
 
 /**
  * @brief read from a buffer
  * 
- * @param buffer the buffer
+ * @param buffer pointer to the buffer
  * @param dest   data destination
  * @param count  number of bytes to write
  */
-void buffer_read(buffer_t buffer, void* dest, size_t count);
+void buffer_read(buffer_t* buffer, void* dest, size_t count);
+
+/**
+ * @brief write a buffer into a stream
+ * 
+ * @param buffer the buffer
+ * @param stream stream destination
+ */
+void buffer_to_stream(buffer_t buffer, stream_t stream);
 
 /**
  * @brief read a stream into a buffer
  * 
  * @param buffer the buffer
- * @param src    stream source
+ * @param stream stream source
  */
-void stream_to_buffer(stream_t stream, buffer_t buffer);
+void stream_to_buffer(buffer_t buffer, stream_t stream);
 
     /* defines */
 /**

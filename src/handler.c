@@ -2,27 +2,25 @@
  * @file handler.c
  * @author andersonarc (e.andersonarc@gmail.com)
  * @brief packet handler system
- * @version 0.3
+ * @version 0.4
  * @date 2021-01-29
  */
     /* includes */
 #include "mcp/handler.h"    /* this */
-#include "mcp/protocol.h"   /* protocol */
 #include "mcp/codec.h"      /* encoders/decoders */
-//todo includes in .c
 
     /* functions */
 /**
- * @brief read a packet from stream and handle it with *globally* specified handler
+ * @brief read a packet from the stream and handle it with a globally specified handler
  * 
- * @param src stream from which to read a packet
+ * @param stream the stream
  */
-void mcp_handle_packet(stream_t src, mcpacket_state state, mcpacket_source source) {
-    size_t length = mcp_varint_stream_decode(src);
-    int id = mcp_varint_stream_decode(src);
+void mcp_handler_execute(stream_t stream, mcp_state_t state, mcp_source_t source) {
+    size_t length = mcp_varint_stream_decode(stream);
+    int id = mcp_varint_stream_decode(stream);
     buffer_t buffer;
     buffer_init(&buffer, length);
-    mcpacket_handler* handler = mcp_get_packet_handler(state, source, id);
+    mcp_handler_t* handler = mcp_handler_get(state, source, id);
     handler(buffer, length);
     buffer_deinit(&buffer);
 }
@@ -30,6 +28,6 @@ void mcp_handle_packet(stream_t src, mcpacket_state state, mcpacket_source sourc
 /**
  * @brief blank packet handler
  * 
- * @param packet incoming packet
+ * @param buffer packet buffer
  */
-void mcp_blank_handler(buffer_t src, size_t length) { }
+void mcp_handler_blank(buffer_t* buffer) { }

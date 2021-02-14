@@ -14,12 +14,10 @@
 #include <stdint.h>         /* integer types */
 #include "mcp/particle.h"  /* particle types */
 #include "mcp/misc.h"       /* miscellanous */
-#include "mcp/nbt.h"        /* nbt data */
 
       /* generic typedefs */
 vector_typedef(char)
 vector_typedef(int32_t)
-optional_typedef(mcp_type_NbtTagCompound)
 optional_typedef(string_t)
 optional_typedef(int32_t)
 
@@ -42,6 +40,47 @@ typedef struct mcp_type_Position {
   int32_t z;
 } mcp_type_Position;
 optional_typedef(mcp_type_Position)
+
+/**
+ * @brief minecraft tag
+ */
+typedef struct mcp_type_Tag {
+  char* tag_name;
+  int32_t_vector_t entries;
+} mcp_type_Tag;
+vector_typedef(mcp_type_Tag)
+
+/**
+ * @brief nbt tag stub
+ */
+typedef void* mcp_type_NbtTagCompound;
+optional_typedef(mcp_type_NbtTagCompound)
+
+/**
+ * @brief nbt type enum
+ */
+typedef enum mcp_type_NbtTag {
+  MCP_NBT_TAG_END,
+  MCP_NBT_TAG_BYTE,
+  MCP_NBT_TAG_SHORT,
+  MCP_NBT_TAG_INT,
+  MCP_NBT_TAG_LONG,
+  MCP_NBT_TAG_FLOAT,
+  MCP_NBT_TAG_DOUBLE,
+  MCP_NBT_TAG_BYTE_ARRAY,
+  MCP_NBT_TAG_STRING,
+  MCP_NBT_TAG_LIST,
+  MCP_NBT_TAG_COMPOUND,
+  MCP_NBT_TAG_INT_ARRAY,
+  MCP_NBT_TAG_LONG_ARRAY
+} mcp_type_NbtTag;
+
+/**
+ * @brief minecraft entity metadata
+ */
+typedef struct mcp_type_EntityMetadata {
+  mcp_type_NbtTag* data;
+} mcp_type_EntityMetadata;
 
 /**
  * @brief minecraft container slot
@@ -79,15 +118,6 @@ typedef struct mcp_type_Smelting {
 } mcp_type_Smelting;
 
 /**
- * @brief minecraft tag
- */
-typedef struct mcp_type_Tag {
-  char* tag_name;
-  int32_t_vector_t entries;
-} mcp_type_Tag;
-vector_typedef(mcp_type_Tag)
-
-/**
  * @brief minecraft item
  */
 typedef struct mcp_type_Item {
@@ -102,12 +132,5 @@ vector_typedef(mcp_type_Item)
 typedef struct mcp_type_EntityEquipment {
    mcp_type_Item_vector_t equipments;
 } mcp_type_EntityEquipment;
-
-/**
- * @brief minecraft entity metadata
- */
-typedef struct mcp_type_EntityMetadata {
-  mcp_type_NbtTag* data;
-} mcp_type_EntityMetadata;
 
 #endif /* MCP_TYPE_H */

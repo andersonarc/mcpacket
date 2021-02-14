@@ -364,7 +364,7 @@ class mc_rest_buffer(simple_type):
 
     def decoder(self):
         return (
-            f"{self.name}.size = src.size - src.index;",
+            f"{self.name}.size = src->size - src->index;",
             f"buffer_read(src, {self.name}.data, {self.name}.size);",
         )
 
@@ -1271,13 +1271,13 @@ class packet:
     def declaration(self): 
         return [
             f"typedef struct {self.class_name} {{",
-            f"{indent}mcpacket_t mcpacket;",
+            f"{indent}mcp_packet_t mcpacket;",
             *(indent + l for f in self.fields for l in f.declaration()),
             f"}} {self.class_name};",
             f"void {self.class_name}_init({self.class_name}* this);",
             f"void {self.class_name}_init_full({self.class_name}* this{self.parameters()});",
-            f"void {self.class_name}_encode({self.class_name}* this, buffer_t dest);", 
-            f"void {self.class_name}_decode({self.class_name}* this, buffer_t src);",
+            f"void {self.class_name}_encode({self.class_name}* this, buffer_t* dest);", 
+            f"void {self.class_name}_decode({self.class_name}* this, buffer_t* src);",
         ]
 
     def encoder(self):
@@ -1292,11 +1292,11 @@ class packet:
                 if packet_tmp_variable in line:
                     tmp = [f"{indent}uint8_t {packet_tmp_variable} = 0;"]
         return [
-            f"void {self.class_name}_encode({self.class_name}* this, buffer_t dest) {{",
+            f"void {self.class_name}_encode({self.class_name}* this, buffer_t* dest) {{",
             f"{indent}size_t {packet_length_variable} = size_varlong(this->mcpacket.id);",
             *tmp,
             *lengths,
-            f"{indent}buffer_init(&dest, {packet_length_variable} );",
+            f"{indent}buffer_init(dest, {packet_length_variable} );",
             f"{indent}mcp_varint_encode({packet_length_variable}, dest);",
             f"{indent}mcp_varint_encode(this->mcpacket.id, dest);",
             *fields,
@@ -1310,7 +1310,7 @@ class packet:
             if packet_tmp_variable in line:
                 tmp = [f"{indent}uint8_t {packet_tmp_variable} = 0;"]
         return [
-            f"void {self.class_name}_decode({self.class_name}* this, buffer_t src) {{",
+            f"void {self.class_name}_decode({self.class_name}* this, buffer_t* src) {{",
             *tmp,
             *fields,
             "}"
@@ -1411,38 +1411,37 @@ def run(version):
         "#include \"mcp/buffer.h\"",
         "#include \"mcp/misc.h\"",
         "#include \"mcp/type.h\"",
-        "#include \"mcp/nbt.h\"",
         "",
         f"#define MC_VERSION \"{version.replace('_', '.')}\"",
         f"#define MC_PROTOCOL_VERSION {mcd.version['version']}",
         "",
-        "typedef void mcpacket_handler(buffer_t src, size_t length);",
+        "typedef void mcp_handler_t(buffer_t* buffer);",
         "",
-        "typedef enum mcpacket_source {",
+        "typedef enum mcp_source_t {",
         "  MCP_SOURCE_CLIENT,",
         "  MCP_SOURCE_SERVER,",
         "  MCP_SOURCE__MAX",
-        "} mcpacket_source;",
+        "} mcp_source_t;",
         "",
-        "typedef enum mcpacket_state {",
+        "typedef enum mcp_state_t {",
         "  MCP_STATE_HANDSHAKING,",
         "  MCP_STATE_STATUS,",
         "  MCP_STATE_LOGIN,",
         "  MCP_STATE_PLAY,",
         "  MCP_STATE__MAX",
-        "} mcpacket_state;",
+        "} mcp_state_t;",
         "",
-        "typedef struct mcpacket_t {",
-        "  mcpacket_state state;",
-        "  mcpacket_source source;",
+        "typedef struct mcp_packet_t {",
+        "  mcp_state_t state;",
+        "  mcp_source_t source;",
         "  int id;",
         "  const string_t name; ",
-        "} mcpacket_t;",
+        "} mcp_packet_t;",
         ""
     ]
     header_lower = [
         "extern const char** mcp_protocol_cstrings[MCP_STATE__MAX][MCP_SOURCE__MAX];",
-        "extern mcpacket_handler** mcp_protocol_handlers[MCP_STATE__MAX][MCP_SOURCE__MAX]; // todo not sure that it works as expected",
+        "extern mcp_handler_t** mcp_protocol_handlers[MCP_STATE__MAX][MCP_SOURCE__MAX]; // todo not sure that it works as expected",
         "extern const int mcp_protocol_max_ids[MCP_STATE__MAX][MCP_SOURCE__MAX];",
         ""
     ]
@@ -1509,7 +1508,7 @@ def run(version):
             header_upper.extend(f"{indent}{l}," for l in packet_enum[state][direction])
             header_upper[-1] = header_upper[-1][:-1]
             header_upper.append("};")
-            header_upper.append(f"extern mcpacket_handler* mcp_{dr}_{state}_handlers[MCP_{dr.upper()}_{state.upper()}__MAX];")
+            header_upper.append(f"extern mcp_handler_t* mcp_{dr}_{state}_handlers[MCP_{dr.upper()}_{state.upper()}__MAX];")
             header_upper.append(f"extern const char* mcp_{dr}_{state}_cstrings[MCP_{dr.upper()}_{state.upper()}__MAX];")
             header_upper.append("")
 
@@ -1522,9 +1521,9 @@ def run(version):
             if len(packets[state][direction]) > 1:
                 impl_upper[-1] = impl_upper[-1][:-1]
             impl_upper.extend(("};", ""))
-            impl_upper.append(f"mcpacket_handler* mcp_{dr}_{state}_handlers[MCP_{dr.upper()}_{state.upper()}__MAX] = {{")
+            impl_upper.append(f"mcp_handler_t* mcp_{dr}_{state}_handlers[MCP_{dr.upper()}_{state.upper()}__MAX] = {{")
             if len(packets[state][direction]) > 1:
-                impl_upper.extend([f"{indent}&mcp_blank_handler,"] * (len(packet_enum[state][direction]) - 1))
+                impl_upper.extend([f"{indent}&mcp_handler_blank,"] * (len(packet_enum[state][direction]) - 1))
                 impl_upper[-1] = impl_upper[-1][:-1]
             impl_upper.extend(("};", ""))
 
@@ -1536,7 +1535,7 @@ def run(version):
         f"{indent}{{mcp_client_play_cstrings, mcp_server_play_cstrings}}",
         "};",
         "",
-        "mcpacket_handler** mcp_protocol_handlers[MCP_STATE__MAX][MCP_SOURCE__MAX] = {",
+        "mcp_handler_t** mcp_protocol_handlers[MCP_STATE__MAX][MCP_SOURCE__MAX] = {",
         f"{indent}{{mcp_client_handshaking_handlers, mcp_server_handshaking_handlers}},",
         f"{indent}{{mcp_client_status_handlers, mcp_server_status_handlers}},",
         f"{indent}{{mcp_client_login_handlers, mcp_server_login_handlers}},",

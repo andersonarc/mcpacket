@@ -2,7 +2,7 @@
  * @file handler.h
  * @author andersonarc (e.andersonarc@gmail.com)
  * @brief packet handler system
- * @version 0.3
+ * @version 0.4
  * @date 2021-01-29
  */
     /* header guard */
@@ -12,47 +12,34 @@
     /* includes */
 #include "mcp/protocol.h" /* protocol */
 
-    /* typedefs */
-/**
- * @brief packet handler function
- */
-typedef void mcp_packet_handler_t(void* packet);
-
-/**
- * @brief generic packet
- */
-typedef struct mcp_generic_packet {
-    mcpacket_t packet;
-} mcp_generic_packet;
-
     /* defines */
 /**
  * @brief get a handler for a packet
  * 
  * @warning very unsafe, throws segmentation fault on error/corrupts the stream silently when reading
  */
-#define mcp_get_packet_handler(state, source, id) mcp_protocol_handlers[state][source][id]
+#define mcp_handler_get(state, source, id) mcp_protocol_handlers[state][source][id]
 
 /**
  * @brief set a handler for a packet
  * 
  * @warning very unsafe, throws segmentation fault on error/corrupts the stream silently when reading
  */
-#define mcp_set_packet_handler(state, source, id, handler) mcp_protocol_handlers[state][source][id] = handler
+#define mcp_handler_set(state, source, id, handler) mcp_protocol_handlers[state][source][id] = handler
 
     /* functions */
 /**
- * @brief read a packet from stream and handle it with *globally* specified handler
+ * @brief read a packet from the stream and handle it with a globally specified handler
  * 
- * @param src stream from which to read a packet
+ * @param stream the stream
  */
-void mcp_handle_packet(stream_t src, mcpacket_state state, mcpacket_source source);
+void mcp_handler_execute(stream_t stream, mcp_state_t state, mcp_source_t source);
 
 /**
  * @brief blank packet handler
  * 
- * @param packet incoming packet
+ * @param buffer packet buffer
  */
-void mcp_blank_handler(buffer_t src, size_t length);
+void mcp_handler_blank(buffer_t* buffer);
 
 #endif /* MCP_HANDLER_H */

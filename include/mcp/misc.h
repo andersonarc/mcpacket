@@ -10,9 +10,8 @@
 #define MCP_MISC_H
 
      /* includes */
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdbool.h>
+#include <stddef.h>  /* size_t */
+#include <stdbool.h> /* boolean */
 
      /* defines */
 /**
