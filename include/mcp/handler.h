@@ -29,11 +29,11 @@
 
     /* functions */
 /**
- * @brief read a packet from the stream and handle it with a globally specified handler
+ * @brief  read a packet from a buffered stream and handle it with a globally specified handler
  * 
- * @param stream the stream
+ * @param buffer the buffer
  */
-void mcp_handler_execute(stream_t stream, mcp_state_t state, mcp_source_t source);
+void mcp_handler_execute(buffer_t* buffer, mcp_state_t state, mcp_source_t source);
 
 /**
  * @brief blank packet handler
