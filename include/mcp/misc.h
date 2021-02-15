@@ -22,7 +22,7 @@
 /**
  * @brief string type
  */
-#define string_t char*
+typedef char* string_t;
 
 /**
  * @brief indicates a runtime-allocated memory value

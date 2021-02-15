@@ -1281,10 +1281,10 @@ class packet:
             f"{indent}mcp_packet_t mcpacket;",
             *(indent + l for f in self.fields for l in f.declaration()),
             f"}} {self.class_name};",
-            f"void {self.class_name}_init({self.class_name}* this);",
-            f"void {self.class_name}_init_full({self.class_name}* this{self.parameters()});",
-            f"void {self.class_name}_encode({self.class_name}* this, mcp_buffer_t* dest);", 
-            f"void {self.class_name}_decode({self.class_name}* this, mcp_buffer_t* src);",
+            f"void mcp_init_{self.postfix}({self.class_name}* this);",
+            f"void mcp_create_{self.postfix}({self.class_name}* this{self.parameters()});",
+            f"void mcp_encode_{self.postfix}({self.class_name}* this, mcp_buffer_t* dest);", 
+            f"void mcp_decode_{self.postfix}({self.class_name}* this, mcp_buffer_t* src);",
         ]
 
     def encoder(self):
@@ -1319,7 +1319,7 @@ class packet:
             if packet_tmp_variable in line:
                 tmp = [f"{indent}uint8_t {packet_tmp_variable} = 0;"]
         return [
-            f"void {self.class_name}_decode({self.class_name}* this, mcp_buffer_t* src) {{",
+            f"void mcp_decode_{self.postfix}({self.class_name}* this, mcp_buffer_t* src) {{",
             *tmp,
             *fields,
             "}"
@@ -1337,7 +1337,7 @@ class packet:
 
     def full_constructor(self):
         return [
-            f"void mcp_init_full_{self.postfix}({self.class_name}* this{self.parameters()}) {{",
+            f"void mcp_create_{self.postfix}({self.class_name}* this{self.parameters()}) {{",
             f"{indent}mcp_init_{self.postfix}(this);",
             *(f"{indent}this->{f.name} = {f.name};" for f in self.fields),
             "}"
@@ -1443,7 +1443,7 @@ def run(version):
         "  mcp_state_t state;",
         "  mcp_source_t source;",
         "  int id;",
-        "  const string_t name; ",
+        "  char* name; ",
         "} mcp_packet_t;",
         ""
     ]

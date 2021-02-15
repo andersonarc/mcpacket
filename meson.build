@@ -24,7 +24,7 @@ protocol = custom_target('protocol',
 
 # get dependencies
 csafe = dependency('csafe', 
-    fallback: ['csafe', 'csafe_dep'])
+    fallback: ['csafe', 'libcsafe_dep'])
 
 # prepare build files
 miniz = files('src/lib/miniz.c')
