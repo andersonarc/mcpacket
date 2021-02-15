@@ -2,12 +2,12 @@
  * @file stream.h
  * @author andersonarc (e.andersonarc@gmail.com)
  * @brief stream io
- * @version 0.1
+ * @version 0.2
  * @date 2021-01-10
  */
     /* header guard */
-#ifndef MCP_STREAM_H
-#define MCP_STREAM_H
+#ifndef MCP_IO_STREAM_H
+#define MCP_IO_STREAM_H
 
     /* includes */
 #include <unistd.h> /* socket io */
@@ -16,16 +16,9 @@
 /**
  * @brief stream data type (file descriptor)
  */
-typedef int stream_t;
+typedef int mcp_stream_t;
 
     /* defines */
-/**
- * @brief initialize a stream
- * 
- * @param stream pointer to the stream
- */
-#define stream_init(stream)
-
 /**
  * @brief deinitialize a stream
  * 
@@ -33,7 +26,7 @@ typedef int stream_t;
  * 
  * @return 0 on success or -1
  */
-#define stream_deinit(stream) close(stream)
+#define mcp_stream_close(stream) close(stream)
 
 /**
  * @brief write to a stream
@@ -44,7 +37,7 @@ typedef int stream_t;
  * 
  * @return number of bytes written or -1
  */
-#define stream_write(stream, src, count) write(stream, src, count)
+#define mcp_stream_write(stream, src, count) write(stream, src, count)
 
 /**
  * @brief read from a stream
@@ -55,12 +48,12 @@ typedef int stream_t;
  * 
  * @return number of bytes read or -1
  */
-#define stream_read(stream, dest, count) read(stream, dest, count)
+#define mcp_stream_read(stream, dest, count) read(stream, dest, count)
 
 /**
  * @brief write a variable to a stream
  * 
- * @param stream   stream_t to write into
+ * @param stream   mcp_stream_t to write into
  * @param variable variable to write from
  * 
  * @warning use with caution,
@@ -68,12 +61,12 @@ typedef int stream_t;
  * 
  * @return number of bytes written or -1
  */
-#define stream_write_variable(stream, variable) stream_write(stream, &(variable), sizeof(variable))
+#define mcp_stream_write_variable(stream, variable) mcp_stream_write(stream, &(variable), sizeof(variable))
 
 /**
  * @brief read a variable from a stream
  * 
- * @param stream   stream_t to read from
+ * @param stream   mcp_stream_t to read from
  * @param variable variable to read into
  * 
  * @warning use with caution,
@@ -81,6 +74,6 @@ typedef int stream_t;
  * 
  * @return number of bytes read or -1
  */
-#define stream_read_variable(stream, variable) stream_read(stream, &(variable), sizeof(variable))
+#define mcp_stream_read_variable(stream, variable) mcp_stream_read(stream, &(variable), sizeof(variable))
 
-#endif /* MCP_STREAM_H */
+#endif /* MCP_IO_STREAM_H */

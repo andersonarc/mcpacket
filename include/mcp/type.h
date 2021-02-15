@@ -12,14 +12,14 @@
 
       /* includes */
 #include <stdint.h>         /* integer types */
-#include "mcp/particle.h"  /* particle types */
+#include "mcp/particle.h"   /* particle types */
 #include "mcp/misc.h"       /* miscellanous */
 
       /* generic typedefs */
-vector_typedef(char)
-vector_typedef(int32_t)
-optional_typedef(string_t)
-optional_typedef(int32_t)
+mcp_generic_vector(char)
+mcp_generic_vector(int32_t)
+mcp_generic_optional(string_t)
+mcp_generic_optional(int32_t)
 
       /* typedefs */
 /**
@@ -29,7 +29,7 @@ typedef struct mcp_type_UUID {
   uint64_t msb;
   uint64_t lsb;
 } mcp_type_UUID;
-optional_typedef(mcp_type_UUID)
+mcp_generic_optional(mcp_type_UUID)
 
 /**
  * @brief minecraft position
@@ -39,7 +39,7 @@ typedef struct mcp_type_Position {
   int32_t y;
   int32_t z;
 } mcp_type_Position;
-optional_typedef(mcp_type_Position)
+mcp_generic_optional(mcp_type_Position)
 
 /**
  * @brief minecraft tag
@@ -48,13 +48,13 @@ typedef struct mcp_type_Tag {
   char* tag_name;
   int32_t_vector_t entries;
 } mcp_type_Tag;
-vector_typedef(mcp_type_Tag)
+mcp_generic_vector(mcp_type_Tag)
 
 /**
  * @brief nbt tag stub
  */
 typedef void* mcp_type_NbtTagCompound;
-optional_typedef(mcp_type_NbtTagCompound)
+mcp_generic_optional(mcp_type_NbtTagCompound)
 
 /**
  * @brief nbt type enum
@@ -91,7 +91,7 @@ typedef struct mcp_type_Slot {
   int8_t item_count;
   mcp_type_NbtTagCompound_optional_t nbt_data;
 } mcp_type_Slot;
-vector_typedef(mcp_type_Slot)
+mcp_generic_vector(mcp_type_Slot)
 
 /**
  * @brief minecraft particle
@@ -124,7 +124,7 @@ typedef struct mcp_type_Item {
   int8_t slot;
   mcp_type_Slot item;
 } mcp_type_Item;
-vector_typedef(mcp_type_Item)
+mcp_generic_vector(mcp_type_Item)
 
 /**
  * @brief minecraft entity equipment

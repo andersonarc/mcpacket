@@ -2,7 +2,7 @@
  * @file misc.h
  * @author andersonarc (andersonarc@github.com)
  * @brief miscellanous utilities
- * @version 0.5
+ * @version 0.6
  * @date 2020-12-07
  */
       /* header guard */
@@ -29,10 +29,11 @@
  */
 #define MALLOC
 
+//todo move generics to other file (type.h) and rename this file to annotation.h
 /**
  * @brief std::optional replacement
  */
-#define optional_typedef(type)      \
+#define mcp_generic_optional(type)      \
 typedef struct type##_optional_t {  \
     type value;                     \
     bool has_value;                 \
@@ -41,7 +42,7 @@ typedef struct type##_optional_t {  \
 /**
  * @brief std::vector replacement
  */
-#define vector_typedef(type)     \
+#define mcp_generic_vector(type)     \
 typedef struct type##_vector_t { \
     type* data;  \
     size_t size; \

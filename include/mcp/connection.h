@@ -10,8 +10,8 @@
 #define MCP_CONNECTION_H
 
     /* includes */
-#include <stdint.h>       /* integer types */
 #include "mcp/protocol.h" /* protocol */
+#include <stdint.h>       /* integer types */
 
     /* typedefs */
 /**
@@ -27,7 +27,7 @@ typedef struct mcp_server_info_t {
  */
 typedef struct mcp_server_t {
     mcp_server_info_t info;
-    buffer_t buffer;
+    mcp_buffer_t buffer;
 } mcp_server_t;
 
 /**

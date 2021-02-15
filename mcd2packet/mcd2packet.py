@@ -41,6 +41,11 @@ def mc_data_name(typename):
 
     return inner
 
+def remove_prefix(string):
+    if string.startswith("mcp_"):
+        return string[4:]
+    return string
+
 
 # MCD/Protodef has two elements of note, "fields" and "types"
 # "Fields" are JSON objects with the following members:
@@ -113,15 +118,15 @@ class generic_type:
         return f"{self.typename} {self.name} = {val};",
 
     def encoder(self):
-        return f"mcp_{self.postfix}_encode(&{self.name}, dest);",
+        return f"mcp_encode_{self.postfix}(&{self.name}, dest);",
 
     def decoder(self):
-        return f"mcp_{self.postfix}_decode(&{self.name}, src);",
+        return f"mcp_decode_{self.postfix}(&{self.name}, src);",
 
     def dec_initialized(self):
         return (
             f"{self.typename} {self.name};", 
-            f"mcp_{self.postfix}_decode(&{self.name}, src);"
+            f"mcp_decode_{self.postfix}(&{self.name}, src);"
         )
 
     # This comes up enough to write some dedicated functions for it
@@ -191,10 +196,10 @@ class num_u8(numeric_type):
     postfix = "byte"
 
     def encoder(self):
-        return f"mcp_{self.postfix}_encode((uint8_t*) &{self.name}, dest);",
+        return f"mcp_encode_{self.postfix}((uint8_t*) &{self.name}, dest);",
 
     def decoder(self):
-        return f"mcp_{self.postfix}_decode((uint8_t*) &{self.name}, src);",
+        return f"mcp_decode_{self.postfix}((uint8_t*) &{self.name}, src);",
 
 
 @mc_data_name("i8")
@@ -219,10 +224,10 @@ class num_i16(num_u16):
     typename = "int16_t"
 
     def encoder(self):
-        return f"mcp_{self.postfix}_encode((uint16_t*) &{self.name}, dest);",
+        return f"mcp_encode_{self.postfix}((uint16_t*) &{self.name}, dest);",
 
     def decoder(self):
-        return f"mcp_{self.postfix}_decode((uint16_t*) &{self.name}, src);",
+        return f"mcp_decode_{self.postfix}((uint16_t*) &{self.name}, src);",
 
 
 @mc_data_name("u32")
@@ -237,10 +242,10 @@ class num_i32(num_u32):
     typename = "int32_t"
 
     def encoder(self):
-        return f"mcp_{self.postfix}_encode((uint32_t*) &{self.name}, dest);",
+        return f"mcp_encode_{self.postfix}((uint32_t*) &{self.name}, dest);",
 
     def decoder(self):
-        return f"mcp_{self.postfix}_decode((uint32_t*) &{self.name}, src);",
+        return f"mcp_decode_{self.postfix}((uint32_t*) &{self.name}, src);",
 
 
 @mc_data_name("u64")
@@ -254,10 +259,10 @@ class num_i64(num_u64):
     typename = "int64_t"
 
     def encoder(self):
-        return f"mcp_{self.postfix}_encode((uint64_t*) &{self.name}, dest);",
+        return f"mcp_encode_{self.postfix}((uint64_t*) &{self.name}, dest);",
 
     def decoder(self):
-        return f"mcp_{self.postfix}_decode((uint64_t*) &{self.name}, src);",
+        return f"mcp_decode_{self.postfix}((uint64_t*) &{self.name}, src);",
 
 @mc_data_name("f32")
 class num_float(num_u32):
@@ -298,10 +303,10 @@ class mc_varint(numeric_type):
         return f"{variable} += size_varint({self.name});",
 
     def encoder(self):
-        return f"mcp_{self.postfix}_encode({self.name}, dest);",
+        return f"mcp_encode_{self.postfix}({self.name}, dest);",
 
     def decoder(self):
-        return f"{self.name} = mcp_{self.postfix}_decode(src);",
+        return f"{self.name} = mcp_decode_{self.postfix}(src);",
 
 
 @mc_data_name("varlong")
@@ -341,13 +346,13 @@ class mc_buffer(simple_type):
     def encoder(self):
         return (
             *self.count(f'{self.name}.size', self).encoder(),
-            f"mcp_buffer_encode(&{self.name}, dest);",
+            f"mcp_encode_buffer(&{self.name}, dest);",
         )
 
     def decoder(self):
         return (
             *self.count(f'{self.name}.size', self).decoder(),
-            f"mcp_buffer_decode(&{self.name}, {self.name}.size, src);",
+            f"mcp_decode_buffer(&{self.name}, {self.name}.size, src);",
         )
 
 
@@ -360,12 +365,12 @@ class mc_rest_buffer(simple_type):
         return f"{variable} += (sizeof(*{self.name}.data) * {self.name}.size);",
 
     def encoder(self):
-        return f"buffer_write(dest, {self.name}.data, {self.name}.size);",
+        return f"mcp_buffer_write(dest, {self.name}.data, {self.name}.size);",
 
     def decoder(self):
         return (
             f"{self.name}.size = src->size - src->index;",
-            f"buffer_read(src, {self.name}.data, {self.name}.size);",
+            f"mcp_buffer_read(src, {self.name}.data, {self.name}.size);",
         )
 
 
@@ -377,10 +382,10 @@ class mc_nbt(simple_type):
         return f"/* todo nbt length */",
 
     def encoder(self):
-        return f"mcp_type_NbtTagCompound_encode(&{self.name}, dest);", 
+        return f"mcp_encode_type_NbtTagCompound(&{self.name}, dest);", 
 
     def decoder(self):
-        return f"mcp_type_NbtTagCompound_decode(&{self.name}, src);",
+        return f"mcp_decode_type_NbtTagCompound(&{self.name}, src);",
 
 
 @mc_data_name("optionalNbt")
@@ -393,66 +398,65 @@ class mc_optional_nbt(simple_type):
     def encoder(self):
         return (
             f"if ({self.name}.has_value) {{",
-            f"{indent}mcp_type_NbtTagCompound_encode(&{self.name}.value, dest);", #todo length
+            f"{indent}mcp_encode_type_NbtTagCompound(&{self.name}.value, dest);", #todo length
             f"}} else {{",
             f"{indent}{packet_tmp_variable} = MCP_NBT_TAG_END;",
-            f"{indent}mcp_byte_encode(&{packet_tmp_variable}, dest);",
+            f"{indent}mcp_encode_byte(&{packet_tmp_variable}, dest);",
             "}"
         )
 
     def decoder(self):
         return (
-            f"mcp_byte_decode(&{packet_tmp_variable}, src);"
+            f"mcp_decode_byte(&{packet_tmp_variable}, src);"
             f"if ({packet_tmp_variable} == MCP_NBT_TAG_COMPOUND) {{",
             f"{indent}{self.name}.has_value = true;",
-            f"{indent}mcp_type_NbtTagCompound_read(&{self.name}.value, src);",
+            f"{indent}mcp_read_type_NbtTagCompound(&{self.name}.value, src);",
             "}"
         )
 
-class self_serializing_type(simple_type):
-    def encoder(self):
-        return f"{self.typename}_encode(&{self.name}, dest);",
-
-    def decoder(self):
-        return f"{self.typename}_decode(&{self.name}, src);",
-
 @mc_data_name("slot")
-class mc_slot(self_serializing_type):
+class mc_slot(simple_type):
     typename = "mcp_type_Slot"
+    postfix = "type_Slot"
 
 
 @mc_data_name("minecraft_smelting_format")
-class mc_smelting(self_serializing_type):
+class mc_smelting(simple_type):
     typename = "mcp_type_Smelting"
+    postfix = "type_Smelting"
 
 
 @mc_data_name("entityMetadata")
-class mc_metadata(self_serializing_type):
+class mc_metadata(simple_type):
     typename = "mcp_type_EntityMetadata"
+    postfix = "type_EntityMetadata"
 
 
 # This is not how topBitSetTerminatedArray works, but the real solution is hard
 # and this solution is easy. As long as this type is only found in the Entity
 # Equipment packet we're going to stick with this solution
 @mc_data_name("topBitSetTerminatedArray")
-class mc_entity_equipment(self_serializing_type):
+class mc_entity_equipment(simple_type):
     typename = "mcp_type_EntityEquipment"
+    postfix = "type_EntityEquipment"
 
 
 @mc_data_name("particleData")
-class mc_particle(self_serializing_type):
+class mc_particle(simple_type):
     typename = "mcp_type_Particle"
+    postfix = "type_Particle"
 
     def __init__(self, name, parent, type_data, use_compare=False):
         super().__init__(name, parent, type_data, use_compare)
         self.id_field = type_data["compareTo"]
 
     def decoder(self):
-        return f"{self.typename}_decode(&{self.name}, (mcp_type_ParticleType) this->{self.id_field}, src);",
+        return f"mcp_decode_{self.postfix}(&{self.name}, (mcp_type_ParticleType) this->{self.id_field}, src);",
 
 
 class vector_type(simple_type):
     element = ""
+    element_postfix = ""
     count = mc_varint
     
     def __init__(self, name, parent, type_data, use_compare=False):
@@ -474,7 +478,7 @@ class vector_type(simple_type):
         return (
             *self.count(f"{self.name}.size", self).encoder(),
             f"for (int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
-            f"{indent}{self.element}_encode(&{self.name}.data[{iterator}], dest);",
+            f"{indent}mcp_encode_{self.element_postfix}(&{self.name}.data[{iterator}], dest);",
             "}",
         )
 
@@ -484,7 +488,7 @@ class vector_type(simple_type):
             *self.count(f"{self.name}.size", self).decoder(),
             f"{self.name}.data = ({self.element}*) malloc({self.name}.size * sizeof({self.element}));",
             f"for (int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
-            f"{indent}{self.element}_decode(&{self.name}.data[{iterator}], src);",
+            f"{indent}mcp_decode_{self.element_postfix}(&{self.name}.data[{iterator}], src);",
             "}"
         )
 
@@ -492,12 +496,14 @@ class vector_type(simple_type):
 @mc_data_name("ingredient")
 class mc_ingredient(vector_type):
     element = "mcp_type_Slot"
+    element_postfix = "type_Slot"
     typename = "mcp_type_Slot_vector_t"
 
 
 @mc_data_name("tags")
 class mc_tags(vector_type):
     element = "mcp_type_Tag"
+    element_postfix = "type_Tag"
     typename = "mcp_type_Tag_vector_t"
 
 
@@ -521,11 +527,11 @@ class mc_option(simple_type):
 
     def declaration(self):
         if isinstance(self.field, simple_type):
-            type_definitions[self.typename] = [f"optional_typedef({self.field.typename})"]
+            type_definitions[self.typename] = [f"mcp_generic_optional({self.field.typename})"]
             return super().declaration()
         self.field.temp_name(f"mcp_type_{self.name}")
         type_definitions[self.typename] = self.field.typedef()
-        type_definitions[self.typename].append(f"optional_typedef({self.field.name})")
+        type_definitions[self.typename].append(f"mcp_generic_optional({self.field.name})")
         self.field.reset_name()
         return [f"{self.typename} {self.name};"]
 
@@ -541,7 +547,7 @@ class mc_option(simple_type):
     def encoder(self):
         self.field.temp_name(f"{self.name}.value")
         result = (
-            f"mcp_byte_encode((uint8_t*) &{self.name}.has_value, dest);",
+            f"mcp_encode_byte((uint8_t*) &{self.name}.has_value, dest);",
             f"if ({self.name}.has_value) {{",
             *(indent + line for line in self.field.encoder()),
             "}"
@@ -551,7 +557,7 @@ class mc_option(simple_type):
 
     def decoder(self):
         ret = [
-            f"mcp_byte_decode((uint8_t*) &{packet_tmp_variable}, src);",
+            f"mcp_decode_byte((uint8_t*) &{packet_tmp_variable}, src);",
             f"if ({packet_tmp_variable} == true) {{"
         ]
         if isinstance(self.field, numeric_type) or type(self.field) in (mc_string,
@@ -579,7 +585,7 @@ class complex_type(generic_type):
 
     def format_type(self, is_g_type):
         if is_g_type:
-            return f"mcp_type_{self.name}{self.get_hash()}"
+            return f"mcp_type_{self.name}{self.get_hash()}" #todo hash issue is still present (collisions)
         return f"mcp_type_{self.name}"
 
     def get_type(self):
@@ -1028,13 +1034,13 @@ class mc_array(simple_type):
         if isinstance(self.field, simple_type):
             self.f_type = self.field.typename
             typename = f"{self.f_type}_vector_t"
-            type_definitions[typename] = [f"vector_typedef({self.f_type})"]
+            type_definitions[typename] = [f"mcp_generic_vector({self.f_type})"]
         else:
             self.field.name = f"mcp_type_{self.packet.packet_name}_{self.name}"
             typename = f"{self.field.name}_vector_t"
             type_definitions[typename] = self.field.typedef()
             self.f_type = self.field.name
-            type_definitions[f"{self.field.name}_vector_t"].append(f"vector_typedef({self.f_type})")
+            type_definitions[f"{self.field.name}_vector_t"].append(f"mcp_generic_vector({self.f_type})")
         if self.is_fixed:
             ret.append(f"{typename} {self.name} /* {self.count} length */;")
         else:
@@ -1253,6 +1259,7 @@ class packet:
         self.packet_id = packet_id
         self.packet_name = packet_name
         self.data = data
+        self.postfix = f"packet_{self.source}_{self.packet_name}"
         self.class_name = f"mcp_packet_{self.source}_{self.packet_name}"
 
         self.fields = []
@@ -1276,8 +1283,8 @@ class packet:
             f"}} {self.class_name};",
             f"void {self.class_name}_init({self.class_name}* this);",
             f"void {self.class_name}_init_full({self.class_name}* this{self.parameters()});",
-            f"void {self.class_name}_encode({self.class_name}* this, buffer_t* dest);", 
-            f"void {self.class_name}_decode({self.class_name}* this, buffer_t* src);",
+            f"void {self.class_name}_encode({self.class_name}* this, mcp_buffer_t* dest);", 
+            f"void {self.class_name}_decode({self.class_name}* this, mcp_buffer_t* src);",
         ]
 
     def encoder(self):
@@ -1292,16 +1299,16 @@ class packet:
                 if packet_tmp_variable in line:
                     tmp = [f"{indent}uint8_t {packet_tmp_variable} = 0;"]
         return [
-            f"void {self.class_name}_encode({self.class_name}* this, buffer_t* dest) {{",
+            f"void mcp_encode_{self.postfix}({self.class_name}* this, mcp_buffer_t* dest) {{",
             f"{indent}size_t {packet_length_variable} = size_varlong(this->mcpacket.id);",
             *tmp,
             *lengths,
-            f"{indent}buffer_allocate(dest, {packet_length_variable});",
-            f"{indent}mcp_varint_stream_encode({packet_length_variable}, dest->stream);",
-            f"{indent}mcp_varint_encode(this->mcpacket.id, dest);",
+            f"{indent}mcp_buffer_allocate(dest, {packet_length_variable});",
+            f"{indent}mcp_encode_stream_varint({packet_length_variable}, dest->stream);",
+            f"{indent}mcp_encode_varint(this->mcpacket.id, dest);",
             *fields,
-            f"{indent}buffer_flush(dest);",
-            f"{indent}buffer_free(dest);",
+            f"{indent}mcp_buffer_flush(dest);",
+            f"{indent}mcp_buffer_free(dest);",
             "}"
         ]
 
@@ -1312,7 +1319,7 @@ class packet:
             if packet_tmp_variable in line:
                 tmp = [f"{indent}uint8_t {packet_tmp_variable} = 0;"]
         return [
-            f"void {self.class_name}_decode({self.class_name}* this, buffer_t* src) {{",
+            f"void {self.class_name}_decode({self.class_name}* this, mcp_buffer_t* src) {{",
             *tmp,
             *fields,
             "}"
@@ -1320,7 +1327,7 @@ class packet:
 
     def constructor(self):
         return [
-            f"void {self.class_name}_init({self.class_name}* this) {{",
+            f"void mcp_init_{self.postfix}({self.class_name}* this) {{",
             f"{indent}this->mcpacket.state = MCP_STATE_{self.state.upper()};",
             f"{indent}this->mcpacket.source = MCP_SOURCE_{self.source.upper()};",
             f"{indent}this->mcpacket.id = {self.packet_id};",
@@ -1330,8 +1337,8 @@ class packet:
 
     def full_constructor(self):
         return [
-            f"void {self.class_name}_init_full({self.class_name}* this{self.parameters()}) {{",
-            f"{indent}{self.class_name}_init(this);",
+            f"void mcp_init_full_{self.postfix}({self.class_name}* this{self.parameters()}) {{",
+            f"{indent}mcp_init_{self.postfix}(this);",
             *(f"{indent}this->{f.name} = {f.name};" for f in self.fields),
             "}"
         ]
@@ -1346,7 +1353,7 @@ warning_header = (
     " * @author SpockBotMC",
     " * @author andersonarc (e.andersonarc@gmail.com)",
     " * @brief generated by mcd2packet protocol specification",
-    " * @version 0.6",
+    " * @version 0.8",
     " * @date 2020-12-12",
     " */"
 )
@@ -1357,7 +1364,7 @@ warning_impl = (
     " * @author SpockBotMC",
     " * @author andersonarc (e.andersonarc@gmail.com)",
     " * @brief generated by mcd2packet protocol specification",
-    " * @version 0.6",
+    " * @version 0.8",
     " * @date 2020-12-12",
     " */"
 )
@@ -1408,15 +1415,15 @@ def run(version):
         "#ifndef MCP_PROTOCOL_H",
         "#define MCP_PROTOCOL_H",
         "",
+        "#include \"mcp/io/buffer.h\"",
         "#include \"mcp/particle.h\"",
-        "#include \"mcp/buffer.h\"",
         "#include \"mcp/misc.h\"",
         "#include \"mcp/type.h\"",
         "",
-        f"#define MC_VERSION \"{version.replace('_', '.')}\"",
-        f"#define MC_PROTOCOL_VERSION {mcd.version['version']}",
+        f"#define MCP_MC_VERSION \"{version.replace('_', '.')}\"",
+        f"#define MCP_PROTOCOL_VERSION {mcd.version['version']}",
         "",
-        "typedef void mcp_handler_t(buffer_t* buffer);",
+        "typedef void mcp_handler_t(mcp_buffer_t* buffer);",
         "",
         "typedef enum mcp_source_t {",
         "  MCP_SOURCE_CLIENT,",
@@ -1524,7 +1531,7 @@ def run(version):
             impl_upper.extend(("};", ""))
             impl_upper.append(f"mcp_handler_t* mcp_{dr}_{state}_handlers[MCP_{dr.upper()}_{state.upper()}__MAX] = {{")
             if len(packets[state][direction]) > 1:
-                impl_upper.extend([f"{indent}&mcp_handler_blank,"] * (len(packet_enum[state][direction]) - 1))
+                impl_upper.extend([f"{indent}&mcp_handler_Blank,"] * (len(packet_enum[state][direction]) - 1))
                 impl_upper[-1] = impl_upper[-1][:-1]
             impl_upper.extend(("};", ""))
 

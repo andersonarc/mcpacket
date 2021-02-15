@@ -6,8 +6,8 @@
  * @date 2021-01-29
  */
     /* includes */
-#include "mcp/handler.h"    /* this */
-#include "mcp/codec.h"      /* encoders/decoders */
+#include "mcp/handler.h" /* this */
+#include "mcp/codec.h"   /* encoders/decoders */
 
     /* functions */
 /**
@@ -15,12 +15,12 @@
  * 
  * @param buffer the buffer
  */
-void mcp_handler_execute(buffer_t* buffer, mcp_state_t state, mcp_source_t source) {
-    buffer_allocate(buffer, mcp_varint_stream_decode(buffer->stream));
-    buffer_init(buffer);
-    mcp_handler_t* handler = mcp_handler_get(state, source, mcp_varint_decode(buffer));
+void mcp_handler_execute(mcp_buffer_t* buffer, mcp_state_t state, mcp_source_t source) {
+    mcp_buffer_allocate(buffer, mcp_decode_stream_varint(buffer->stream));
+    mcp_buffer_init(buffer);
+    mcp_handler_t* handler = mcp_handler_get(state, source, mcp_decode_varint(buffer));
     handler(buffer);
-    buffer_free(buffer);
+    mcp_buffer_free(buffer);
 }
 
 /**
@@ -28,4 +28,4 @@ void mcp_handler_execute(buffer_t* buffer, mcp_state_t state, mcp_source_t sourc
  * 
  * @param buffer packet buffer
  */
-void mcp_handler_blank(buffer_t* buffer) { }
+void mcp_handler_Blank(mcp_buffer_t* buffer) { }
