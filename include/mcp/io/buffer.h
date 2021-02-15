@@ -43,6 +43,15 @@ void mcp_buffer_bind(mcp_buffer_t* buffer, mcp_stream_t stream);
 MALLOC void mcp_buffer_allocate(mcp_buffer_t* buffer, size_t size); //todo return status
 
 /**
+ * @brief set already allocated data for a buffer
+ *
+ * @param buffer pointer to the buffer
+ * @param data   data value
+ * @param size   data size
+ */
+void mcp_buffer_set(mcp_buffer_t* buffer, char* data, size_t size);
+
+/**
  * @brief initialize a buffer
  * 
  * @param buffer pointer to the buffer

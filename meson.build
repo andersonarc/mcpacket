@@ -25,16 +25,16 @@ protocol = custom_target('protocol',
 # get dependencies
 csafe = dependency('csafe', 
     fallback: ['csafe', 'libcsafe_dep'])
+zlib = dependency('zlib')
 
 # prepare build files
-miniz = files('src/lib/miniz.c')
 src = files('src/handler.c', 'src/codec.c', 'src/io/buffer.c', 'src/varnum.c')
 include = include_directories('include')
 
 # compile library
-libmcpacket = library('mcpacket', [src, protocol, miniz],
+libmcpacket = library('mcpacket', [src, protocol],
     include_directories: include,
-    dependencies: [csafe],
+    dependencies: [csafe, zlib],
     c_args: ['-Wno-switch'])
 
 # create a dependency

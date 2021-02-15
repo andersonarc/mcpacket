@@ -486,7 +486,7 @@ class vector_type(simple_type):
         iterator = f"i{self.depth}"
         return (
             *self.count(f"{self.name}.size", self).decoder(),
-            f"{self.name}.data = ({self.element}*) malloc({self.name}.size * sizeof({self.element}));",
+            f"{self.name}.data = malloc({self.name}.size * sizeof({self.element}));",
             f"for (int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
             f"{indent}mcp_decode_{self.element_postfix}(&{self.name}.data[{iterator}], src);",
             "}"
@@ -1080,7 +1080,7 @@ class mc_array(simple_type):
         self.field.temp_name(f"{self.name}.data[{iterator}]")
         result = [
             *self.count.decoder(),
-            f"{self.name}.data = ({self.f_type}*) malloc({self.name}.size * sizeof({self.f_type}));",
+            f"{self.name}.data = malloc({self.name}.size * sizeof({self.f_type}));",
             f"for (int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
             *(indent + l for l in self.field.decoder()),
             "}"
@@ -1134,7 +1134,7 @@ class mc_array(simple_type):
         self.field.temp_name(f"{self.name}.data[{iterator}]")
         result = [
             f"{self.name}.size = {self.get_foreign()};",
-            f"{self.name}.data = ({self.f_type}*) malloc({self.name}.size * sizeof({self.f_type}));",
+            f"{self.name}.data = malloc({self.name}.size * sizeof({self.f_type}));",
             f"for (int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
             *(indent + l for l in self.field.decoder()),
             "}"
@@ -1312,6 +1312,37 @@ class packet:
             "}"
         ]
 
+    def compressed_encoder(self):
+        lengths = [*(indent + l for f in self.fields for l in get_length(f))]
+        fields = [*(indent + l for f in self.fields for l in get_encoder(f))]
+        tmp = []
+        for line in lengths:
+            if packet_tmp_variable in line:
+                tmp = [f"{indent}uint8_t {packet_tmp_variable} = 0;"]
+        if len(tmp) == 0:
+            for line in fields:
+                if packet_tmp_variable in line:
+                    tmp = [f"{indent}uint8_t {packet_tmp_variable} = 0;"]
+        return [
+            f"void mcp_encode_compressed_{self.postfix}({self.class_name}* this, mcp_buffer_t* dest) {{",
+            f"{indent}size_t {packet_length_variable} = size_varlong(this->mcpacket.id);",
+            *tmp,
+            *lengths,
+            f"{indent}mcp_buffer_allocate(dest, {packet_length_variable});",
+            f"{indent}mcp_encode_varint(this->mcpacket.id, dest);",
+            *fields,
+            f"{indent}size_t compressed_size = compressBound(dest->size);",
+            f"{indent}char* compressed = malloc(sizeof(char*) * compressed_size);"
+            f"{indent}compress((Bytef*) compressed, (uLongf*) &compressed_size, (Bytef*) dest->data, (uLong) dest->size);",
+            f"{indent}mcp_buffer_free(dest);",
+            f"{indent}mcp_buffer_set(dest, realloc(compressed, compressed_size), compressed_size);"
+            f"{indent}mcp_encode_stream_varint(dest->stream, compressed_size + size_varlong({packet_length_variable}));",
+            f"{indent}mcp_encode_stream_varint(dest->stream, {packet_length_variable});",
+            f"{indent}mcp_buffer_flush(dest);",
+            f"{indent}mcp_buffer_free(dest);"
+            "}"
+        ]
+
     def decoder(self):
         fields = [*(indent + l for f in self.fields for l in get_decoder(f))]
         tmp = []
@@ -1415,6 +1446,7 @@ def run(version):
         "#ifndef MCP_PROTOCOL_H",
         "#define MCP_PROTOCOL_H",
         "",
+        "#include <zlib.h>",
         "#include \"mcp/io/buffer.h\"",
         "#include \"mcp/particle.h\"",
         "#include \"mcp/misc.h\"",
@@ -1503,6 +1535,7 @@ def run(version):
                 header_lower.append("")
 
                 impl_lower += pak.encoder()
+                impl_lower += pak.compressed_encoder()
                 impl_lower += pak.decoder()
                 impl_lower += pak.constructor()
                 impl_lower += pak.full_constructor()

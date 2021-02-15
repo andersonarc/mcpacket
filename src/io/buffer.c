@@ -34,6 +34,18 @@ MALLOC void mcp_buffer_allocate(mcp_buffer_t* buffer, size_t size) {
 }
 
 /**
+ * @brief set already allocated data for a buffer
+ *
+ * @param buffer pointer to the buffer
+ * @param data   data value
+ * @param size   data size
+ */
+void mcp_buffer_set(mcp_buffer_t* buffer, char* data, size_t size) {
+    buffer->data = data;
+    buffer->size = size;
+}
+
+/**
  * @brief initialize a buffer
  * 
  * @param buffer pointer to the buffer
