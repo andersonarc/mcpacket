@@ -30,6 +30,7 @@ MALLOC void buffer_init(buffer_t* buffer, size_t size) {
     buffer->data = malloc(sizeof(char) * size);
     buffer->size = size;
     buffer->index = 0;
+    stream_read(buffer->stream, buffer->data, buffer->size);
 }
 
 /**
@@ -60,7 +61,7 @@ void buffer_flush(buffer_t* buffer) {
  * @param count  number of bytes to write
  */
 void buffer_write(buffer_t* buffer, void* src, size_t count) {
-    memcpy(&buffer->data[buffer->index], src, count);
+    memcpy(&(buffer->data[buffer->index]), src, count);
     buffer->index += count;
 }
 
@@ -75,6 +76,6 @@ void buffer_write(buffer_t* buffer, void* src, size_t count) {
  * @warning buffer overflow is possible
  */
 void buffer_read(buffer_t* buffer, void* dest, size_t count) {
-    memcpy(dest, &buffer->data[buffer->index], count);
+    memcpy(dest, &(buffer->data[buffer->index]), count);
     buffer->index += count;
 }
