@@ -1296,12 +1296,12 @@ class packet:
             f"{indent}size_t {packet_length_variable} = size_varlong(this->mcpacket.id);",
             *tmp,
             *lengths,
-            f"{indent}buffer_init(dest, {packet_length_variable});",
+            f"{indent}buffer_allocate(dest, {packet_length_variable});",
             f"{indent}mcp_varint_stream_encode({packet_length_variable}, dest->stream);",
             f"{indent}mcp_varint_encode(this->mcpacket.id, dest);",
             *fields,
             f"{indent}buffer_flush(dest);",
-            f"{indent}buffer_deinit(dest);",
+            f"{indent}buffer_free(dest);",
             "}"
         ]
 
@@ -1332,7 +1332,6 @@ class packet:
         return [
             f"void {self.class_name}_init_full({self.class_name}* this{self.parameters()}) {{",
             f"{indent}{self.class_name}_init(this);",
-            # todo create immutable mcpackets and assign pointers?
             *(f"{indent}this->{f.name} = {f.name};" for f in self.fields),
             "}"
         ]

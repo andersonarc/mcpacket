@@ -21,26 +21,34 @@ void buffer_bind(buffer_t* buffer, stream_t stream) {
 }
 
 /**
- * @brief initialize a buffer
+ * @brief allocate a buffer
  *
  * @param buffer pointer to the buffer
  * @param size   buffer size
  */
-MALLOC void buffer_init(buffer_t* buffer, size_t size) {
+MALLOC void buffer_allocate(buffer_t* buffer, size_t size) {
     buffer->data = malloc(sizeof(char) * size);
     buffer->size = size;
     buffer->index = 0;
+}
+
+/**
+ * @brief initialize a buffer
+ * 
+ * @param buffer pointer to the buffer
+ */
+void buffer_init(buffer_t* buffer) {
     stream_read(buffer->stream, buffer->data, buffer->size);
 }
 
 /**
- * @brief deinitialize a buffer
+ * @brief free a buffer
  *
  * @param buffer pointer to the buffer
  * 
  * @warning it's the caller's responsibility to flush the buffer/close the stream
  */
-void buffer_deinit(buffer_t* buffer) {
+void buffer_free(buffer_t* buffer) {
     free(buffer->data);
 }
 
