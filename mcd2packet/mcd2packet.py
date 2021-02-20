@@ -563,8 +563,6 @@ class mc_option(simple_type):
         if isinstance(self.field, numeric_type) or type(self.field) in (mc_string,
                                                                         mc_buffer, mc_rest_buffer):
             self.field.temp_name(self.name)
-        # todo check origin
-        # /\ what does it mean? does it make sense?
         ret.append(f"{indent}{self.name}.has_value = true;")
         self.field.temp_name(f"{self.name}.value")
         ret.extend(indent + line for line in self.field.decoder())
@@ -1447,6 +1445,7 @@ def run(version):
         "#define MCP_PROTOCOL_H",
         "",
         "#include <zlib.h>",
+        "#include \"mcp/connection.h\"",
         "#include \"mcp/io/buffer.h\"",
         "#include \"mcp/particle.h\"",
         "#include \"mcp/misc.h\"",
@@ -1455,33 +1454,10 @@ def run(version):
         f"#define MCP_MC_VERSION \"{version.replace('_', '.')}\"",
         f"#define MCP_PROTOCOL_VERSION {mcd.version['version']}",
         "",
-        "typedef void mcp_handler_t(mcp_buffer_t* buffer);",
-        "",
-        "typedef enum mcp_source_t {",
-        "  MCP_SOURCE_CLIENT,",
-        "  MCP_SOURCE_SERVER,",
-        "  MCP_SOURCE__MAX",
-        "} mcp_source_t;",
-        "",
-        "typedef enum mcp_state_t {",
-        "  MCP_STATE_HANDSHAKING,",
-        "  MCP_STATE_STATUS,",
-        "  MCP_STATE_LOGIN,",
-        "  MCP_STATE_PLAY,",
-        "  MCP_STATE__MAX",
-        "} mcp_state_t;",
-        "",
-        "typedef struct mcp_packet_t {",
-        "  mcp_state_t state;",
-        "  mcp_source_t source;",
-        "  int id;",
-        "  char* name; ",
-        "} mcp_packet_t;",
-        ""
     ]
     header_lower = [
         "extern const char** mcp_protocol_cstrings[MCP_STATE__MAX][MCP_SOURCE__MAX];",
-        "extern mcp_handler_t** mcp_protocol_handlers[MCP_STATE__MAX][MCP_SOURCE__MAX]; // todo not sure that it works as expected",
+        "extern mcp_handler_t** mcp_protocol_handlers[MCP_STATE__MAX][MCP_SOURCE__MAX];",
         "extern const int mcp_protocol_max_ids[MCP_STATE__MAX][MCP_SOURCE__MAX];",
         ""
     ]
@@ -1500,7 +1476,6 @@ def run(version):
     ]
     impl_lower = []
     particle_header = [
-        #todo problem - decoder fails reading extra bytes?
         *warning_particle,
         f"/* MCD version {version.replace('_', '.')} */",
         "#ifndef MCP_PARTICLE_H",

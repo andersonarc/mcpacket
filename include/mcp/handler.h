@@ -10,7 +10,7 @@
 #define MCP_HANDLER_H
 
     /* includes */
-#include "mcp/protocol.h" /* protocol */
+#include "mcp/protocol.h"   /* protocol */
 
     /* defines */
 /**
@@ -31,22 +31,22 @@
 /**
  * @brief read a packet from a buffered stream and handle it with a globally specified handler
  * 
- * @param buffer the buffer
+ * @param context connection context
  */
-void mcp_handler_execute(mcp_buffer_t* buffer, mcp_state_t state, mcp_source_t source);
+void mcp_handler_execute(mcp_context_t* context);
 
 /**
  * @brief read and decompress a packet from a buffered stream and handle it with a globally specified handler
  * 
- * @param buffer the buffer
+ * @param context connection context
  */
-void mcp_handler_compressed_execute(mcp_buffer_t* buffer, mcp_state_t state, mcp_source_t source);
+void mcp_handler_compressed_execute(mcp_context_t* context);
 
 /**
  * @brief blank packet handler
  * 
- * @param buffer packet buffer
+ * @param context connection context
  */
-void mcp_handler_Blank(mcp_buffer_t* buffer);
+void mcp_handler_Blank(mcp_context_t* context);
 
 #endif /* MCP_HANDLER_H */
