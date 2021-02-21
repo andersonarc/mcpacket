@@ -12,6 +12,7 @@
     /* includes */
 #include <stdint.h>        /* integer types */
 #include "mcp/io/buffer.h" /* buffered io */
+#include "mcp/type.h"      /* data types */
 
     /* typedefs */
 /**
@@ -57,6 +58,7 @@ typedef struct mcp_server_t {
  */
 typedef struct mcp_client_t {
     char* username;
+    mcp_type_UUID uuid;
 } mcp_client_t;
 
 /**
