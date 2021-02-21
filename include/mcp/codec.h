@@ -136,7 +136,7 @@ void mcp_decode_lef64(double* this, mcp_buffer_t* src);
  */
 void mcp_encode_string(char** this, mcp_buffer_t* dest);
 void mcp_decode_string(char** this, mcp_buffer_t* src);
-size_t size_string(const char* src);
+size_t mcp_length_string(const char* src);
 
 /**
  * @brief buffer

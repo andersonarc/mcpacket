@@ -300,7 +300,7 @@ class mc_varint(numeric_type):
     postfix = "varint"
     
     def length(self, variable):
-        return f"{variable} += size_varint({self.name});",
+        return f"{variable} += mcp_length_varint({self.name});",
 
     def encoder(self):
         return f"mcp_encode_{self.postfix}({self.name}, dest);",
@@ -316,7 +316,7 @@ class mc_varlong(numeric_type):
     postfix = "varint"
     
     def length(self, variable):
-        return f"{variable} += size_varlong({self.name});",
+        return f"{variable} += mcp_length_varlong({self.name});",
 
 
 @mc_data_name("string")
@@ -325,7 +325,7 @@ class mc_string(simple_type):
     postfix = "string"
     
     def length(self, variable):
-        return f"{variable} += size_string({self.name});",
+        return f"{variable} += mcp_length_string({self.name});",
 
 
 @mc_data_name("buffer")
@@ -1279,65 +1279,86 @@ class packet:
             f"{indent}mcp_packet_t mcpacket;",
             *(indent + l for f in self.fields for l in f.declaration()),
             f"}} {self.class_name};",
+            f"void mcp_send_{self.postfix}({self.class_name}* this, mcp_context_t* context);",
             f"void mcp_init_{self.postfix}({self.class_name}* this);",
             f"void mcp_create_{self.postfix}({self.class_name}* this{self.parameters()});",
-            f"void mcp_encode_{self.postfix}({self.class_name}* this, mcp_buffer_t* dest);", 
+            f"void mcp_length_{self.postfix}({self.class_name}* this, size_t* length);",
             f"void mcp_decode_{self.postfix}({self.class_name}* this, mcp_buffer_t* src);",
+            f"void mcp_encode_{self.postfix}({self.class_name}* this, mcp_buffer_t* dest);", 
+            f"void mcp_encode_compressed_{self.postfix}({self.class_name}* this, mcp_buffer_t* dest, size_t {packet_length_variable});", 
+            f"void mcp_encode_uncompressed_{self.postfix}({self.class_name}* this, mcp_buffer_t* dest, size_t {packet_length_variable});", 
         ]
 
-    def encoder(self):
+    def length(self):
+        global packet_length_variable
+        previous = packet_length_variable
+        packet_length_variable = "*length"
         lengths = [*(indent + l for f in self.fields for l in get_length(f))]
-        fields = [*(indent + l for f in self.fields for l in get_encoder(f))]
+        packet_length_variable = previous
         tmp = []
         for line in lengths:
             if packet_tmp_variable in line:
                 tmp = [f"{indent}uint8_t {packet_tmp_variable} = 0;"]
-        if len(tmp) == 0:
-            for line in fields:
-                if packet_tmp_variable in line:
-                    tmp = [f"{indent}uint8_t {packet_tmp_variable} = 0;"]
         return [
-            f"void mcp_encode_{self.postfix}({self.class_name}* this, mcp_buffer_t* dest) {{",
-            f"{indent}size_t {packet_length_variable} = size_varlong(this->mcpacket.id);",
+            f"void mcp_length_{self.postfix}({self.class_name}* this, size_t* length) {{",
+            f"{indent}*length = mcp_length_varlong(this->mcpacket.id);",
             *tmp,
             *lengths,
-            f"{indent}mcp_buffer_allocate(dest, {packet_length_variable});",
-            f"{indent}mcp_encode_stream_varint({packet_length_variable}, dest->stream);",
+            "}"
+        ]
+
+    def sender(self):
+        return [
+            f"void mcp_send_{self.postfix}({self.class_name}* this, mcp_context_t* context) {{",
+            f"{indent}size_t {packet_length_variable};",
+            f"{indent}mcp_length_{self.postfix}(this, &{packet_length_variable});",
+            f"{indent}if (context->compression_threshold > 0 && {packet_length_variable} > context->compression_threshold) {{",
+            f"{indent*2}mcp_encode_compressed_{self.postfix}(this, &context->buffer, {packet_length_variable});",
+            f"{indent}}} else {{",
+            f"{indent*2}mcp_encode_uncompressed_{self.postfix}(this, &context->buffer, {packet_length_variable});",
+            f"{indent}}}",
+            "}"
+        ]
+        
+    def encoder(self):
+        fields = [*(indent + l for f in self.fields for l in get_encoder(f))]
+        tmp = []
+        for line in fields:
+            if packet_tmp_variable in line:
+                tmp = [f"{indent}uint8_t {packet_tmp_variable} = 0;"]
+        return [
+            f"void mcp_encode_{self.postfix}({self.class_name}* this, mcp_buffer_t* dest) {{",
+            *tmp,
             f"{indent}mcp_encode_varint(this->mcpacket.id, dest);",
             *fields,
+            "}"
+        ]
+
+    def uncompressed_encoder(self):
+        return [
+            f"void mcp_encode_uncompressed_{self.postfix}({self.class_name}* this, mcp_buffer_t* dest, size_t {packet_length_variable}) {{",
+            f"{indent}mcp_buffer_allocate(dest, {packet_length_variable});",
+            f"{indent}mcp_encode_stream_varint({packet_length_variable}, dest->stream);",
+            f"{indent}mcp_encode_{self.postfix}(this, dest);",
             f"{indent}mcp_buffer_flush(dest);",
             f"{indent}mcp_buffer_free(dest);",
             "}"
         ]
 
     def compressed_encoder(self):
-        lengths = [*(indent + l for f in self.fields for l in get_length(f))]
-        fields = [*(indent + l for f in self.fields for l in get_encoder(f))]
-        tmp = []
-        for line in lengths:
-            if packet_tmp_variable in line:
-                tmp = [f"{indent}uint8_t {packet_tmp_variable} = 0;"]
-        if len(tmp) == 0:
-            for line in fields:
-                if packet_tmp_variable in line:
-                    tmp = [f"{indent}uint8_t {packet_tmp_variable} = 0;"]
         return [
-            f"void mcp_encode_compressed_{self.postfix}({self.class_name}* this, mcp_buffer_t* dest) {{",
-            f"{indent}size_t {packet_length_variable} = size_varlong(this->mcpacket.id);",
-            *tmp,
-            *lengths,
+            f"void mcp_encode_compressed_{self.postfix}({self.class_name}* this, mcp_buffer_t* dest, size_t {packet_length_variable}) {{",
+            f"{indent}size_t compressed_size = compressBound({packet_length_variable});",
+            f"{indent}char* compressed = malloc(sizeof(char*) * compressed_size);",
             f"{indent}mcp_buffer_allocate(dest, {packet_length_variable});",
-            f"{indent}mcp_encode_varint(this->mcpacket.id, dest);",
-            *fields,
-            f"{indent}size_t compressed_size = compressBound(dest->size);",
-            f"{indent}char* compressed = malloc(sizeof(char*) * compressed_size);"
+            f"{indent}mcp_encode_{self.postfix}(this, dest);",
             f"{indent}compress((Bytef*) compressed, (uLongf*) &compressed_size, (Bytef*) dest->data, (uLong) dest->size);",
-            f"{indent}mcp_buffer_free(dest);",
-            f"{indent}mcp_buffer_set(dest, realloc(compressed, compressed_size), compressed_size);"
-            f"{indent}mcp_encode_stream_varint(dest->stream, compressed_size + size_varlong({packet_length_variable}));",
+            f"{indent}mcp_encode_stream_varint(dest->stream, compressed_size + mcp_length_varlong({packet_length_variable}));",
             f"{indent}mcp_encode_stream_varint(dest->stream, {packet_length_variable});",
+            f"{indent}mcp_buffer_free(dest);",
+            f"{indent}mcp_buffer_set(dest, realloc(compressed, compressed_size), compressed_size);",
             f"{indent}mcp_buffer_flush(dest);",
-            f"{indent}mcp_buffer_free(dest);"
+            f"{indent}mcp_buffer_free(dest);",
             "}"
         ]
 
@@ -1509,11 +1530,14 @@ def run(version):
                 header_lower += pak.declaration()
                 header_lower.append("")
 
-                impl_lower += pak.encoder()
-                impl_lower += pak.compressed_encoder()
-                impl_lower += pak.decoder()
+                impl_lower += pak.sender()
                 impl_lower += pak.constructor()
                 impl_lower += pak.full_constructor()
+                impl_lower += pak.length()
+                impl_lower += pak.decoder()
+                impl_lower += pak.encoder()
+                impl_lower += pak.compressed_encoder()
+                impl_lower += pak.uncompressed_encoder()
                 impl_lower.append("")
 
     for state in mc_states: 

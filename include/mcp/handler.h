@@ -29,18 +29,27 @@
 
     /* functions */
 /**
- * @brief read a packet from a buffered stream and handle it with a globally specified handler
+ * @brief interface for mcp handler calls
  * 
  * @param context connection context
  */
-void mcp_handler_execute(mcp_context_t* context);
+void mcp_receive(mcp_context_t* context);
+
+/**
+ * @brief read a packet from a buffered stream and handle it with a globally specified handler
+ * 
+ * @param context connection context
+ * @param length full packet length
+ */
+void mcp_handler_execute_uncompressed(mcp_context_t* context, size_t length);
 
 /**
  * @brief read and decompress a packet from a buffered stream and handle it with a globally specified handler
  * 
  * @param context connection context
+ * @param length full packet length
  */
-void mcp_handler_compressed_execute(mcp_context_t* context);
+void mcp_handler_execute_compressed(mcp_context_t* context, size_t length);
 
 /**
  * @brief blank packet handler

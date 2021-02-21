@@ -68,6 +68,7 @@ typedef struct mcp_context_t {
     mcp_buffer_t buffer;
     mcp_state_t state;
     mcp_source_t source;
+    int compression_threshold;
 } mcp_context_t;
 
 /**

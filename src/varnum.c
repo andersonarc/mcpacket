@@ -34,7 +34,7 @@ int verify_varlong(const char *buf, size_t max_len) {
 /**
  * @brief calculate varnum size for fixed integer
  */
-size_t size_varint(uint32_t varint) {
+size_t mcp_length_varint(uint32_t varint) {
   if(varint < (1 << 7))
     return 1;
   if(varint < (1 << 14))
@@ -45,7 +45,7 @@ size_t size_varint(uint32_t varint) {
     return 4;
   return 5;
 }
-size_t size_varlong(uint64_t varlong) {
+size_t mcp_length_varlong(uint64_t varlong) {
   if(varlong < (1 << 7))
     return 1;
   if(varlong < (1 << 14))

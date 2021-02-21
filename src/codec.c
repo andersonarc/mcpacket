@@ -513,9 +513,9 @@ MALLOC void mcp_decode_string(char** this, mcp_buffer_t* src) {
   string[length] = 0;
   *this = string;
 }
-size_t size_string(const char* src) {
+size_t mcp_length_string(const char* src) {
   size_t length = strlen(src);
-  return size_varlong(length) + length;
+  return mcp_length_varlong(length) + length;
 }
 
 /**

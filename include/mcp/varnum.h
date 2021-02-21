@@ -33,7 +33,7 @@ int verify_varlong(const char *buf, size_t max_len);
 /**
  * @brief calculate varnum size for fixed integer
  */
-size_t size_varint(uint32_t varint);
-size_t size_varlong(uint64_t varlong);
+size_t mcp_length_varint(uint32_t varint);
+size_t mcp_length_varlong(uint64_t varlong);
 
 #endif /* MCP_VARNUM_H */
