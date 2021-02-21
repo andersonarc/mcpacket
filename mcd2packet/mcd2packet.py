@@ -1487,8 +1487,6 @@ def run(version):
         f"/* MCD version {version.replace('_', '.')} */",
         "#include <malloc.h>",
         "#include <string.h>",
-        "#include \"csafe/log.h\"",
-        "#include \"csafe/logf.h\"",
         "#include \"mcp/protocol.h\"",
         "#include \"mcp/handler.h\"",
         "#include \"mcp/varnum.h\"",
