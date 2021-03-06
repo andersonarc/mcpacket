@@ -34,16 +34,18 @@ void mcp_handler_execute_uncompressed(mcp_context_t* context, size_t length) {
  * @param length full packet length
  */
 void mcp_handler_execute_compressed(mcp_context_t* context, size_t length) {
-    size_t uncompressed_size = mcp_decode_stream_varint(context->buffer.stream);
-    size_t compressed_size = length - mcp_length_varlong(uncompressed_size);  //todo uncompressed size allocated incorrectly, leads to buffer overflow
-
-    char* compressed = malloc(sizeof(char*) * compressed_size);
-    mcp_stream_read(context->buffer.stream, compressed, compressed_size);
-
-    mcp_buffer_allocate(&context->buffer, uncompressed_size);
-    uncompress((Bytef*) &context->buffer.data, (uLongf*) &uncompressed_size, (Bytef*) compressed, (uLong) compressed_size);
-    free(compressed);
-
+    size_t data_size = mcp_decode_stream_varint(context->buffer.stream);
+    size_t buffer_size = length - mcp_length_varlong(data_size);
+    if (data_size == 0) {
+        mcp_buffer_allocate(&context->buffer, buffer_size);
+        mcp_buffer_init(&context->buffer);
+    } else {
+        char* compressed = malloc(sizeof(char*) * buffer_size);
+        mcp_stream_read(context->buffer.stream, compressed, buffer_size);
+        mcp_buffer_allocate(&context->buffer, data_size);
+        uncompress((Bytef*) &context->buffer.data, (uLongf*) &data_size, (Bytef*) compressed, (uLong) buffer_size);
+        free(compressed);
+    }
     mcp_handler_t* handler = mcp_handler_get(context->state, context->source, mcp_decode_varint(&context->buffer));
     handler(context);
     mcp_buffer_free(&context->buffer);
