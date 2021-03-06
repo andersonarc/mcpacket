@@ -14,20 +14,6 @@
 
     /* functions */
 /**
- * @brief interface for mcp handler calls
- * 
- * @param context connection context
- */
-void mcp_receive(mcp_context_t* context) {
-    size_t length = mcp_decode_stream_varint(context->buffer.stream);
-    if (context->compression_threshold > 0 && length > context->compression_threshold) {
-        mcp_handler_execute_compressed(context, length);
-    } else {
-        mcp_handler_execute_uncompressed(context, length);
-    }
-}
-
-/**
  * @brief read a packet from a buffered stream and handle it with a globally specified handler
  * 
  * @param context connection context
@@ -49,7 +35,7 @@ void mcp_handler_execute_uncompressed(mcp_context_t* context, size_t length) {
  */
 void mcp_handler_execute_compressed(mcp_context_t* context, size_t length) {
     size_t uncompressed_size = mcp_decode_stream_varint(context->buffer.stream);
-    size_t compressed_size = length - mcp_length_varlong(uncompressed_size);
+    size_t compressed_size = length - mcp_length_varlong(uncompressed_size);  //todo uncompressed size allocated incorrectly, leads to buffer overflow
 
     char* compressed = malloc(sizeof(char*) * compressed_size);
     mcp_stream_read(context->buffer.stream, compressed, compressed_size);

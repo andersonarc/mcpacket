@@ -1,7 +1,7 @@
 /**
  * @file connection.h
  * @author andersonarc (e.andersonarc@gmail.com)
- * @brief connection structures
+ * @brief connection structures and packet input/output functions
  * @version 0.2
  * @date 2021-02-07
  */
@@ -77,5 +77,20 @@ typedef struct mcp_context_t {
  * @brief packet handler type
  */
 typedef void mcp_handler_t(mcp_context_t* context);
+
+    /* functions */
+/**
+ * @brief interface for receiving packets
+ * 
+ * @param context connection context
+ */
+void mcp_receive(mcp_context_t* context);
+
+/**
+ * @brief interface for sending packets
+ * 
+ * @param context connection context with filled buffer
+ */
+void mcp_send(mcp_context_t* context);
 
 #endif /* MCP_CONNECTION_H */

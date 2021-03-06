@@ -29,13 +29,6 @@
 
     /* functions */
 /**
- * @brief interface for mcp handler calls
- * 
- * @param context connection context
- */
-void mcp_receive(mcp_context_t* context);
-
-/**
  * @brief read a packet from a buffered stream and handle it with a globally specified handler
  * 
  * @param context connection context
