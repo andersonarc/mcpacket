@@ -53,13 +53,13 @@ void mcp_send(mcp_context_t* context) {
             size_t compressed_size = compressBound(context->buffer.size);
             char* compressed = malloc(sizeof(char*) * compressed_size);
             compress((Bytef*) compressed, (uLongf*) &compressed_size, (Bytef*) context->buffer.data, (uLong) context->buffer.size);
-            mcp_encode_stream_varint(context->buffer.stream, compressed_size + mcp_length_varlong(context->buffer.size));
-            mcp_encode_stream_varint(context->buffer.stream, context->buffer.size);
+            mcp_encode_stream_varint(compressed_size + mcp_length_varlong(context->buffer.size), context->buffer.stream);
+            mcp_encode_stream_varint(context->buffer.size, context->buffer.stream);
             mcp_buffer_free(&context->buffer);
             mcp_buffer_set(&context->buffer, realloc(compressed, compressed_size), compressed_size);
         } else {
-            mcp_encode_stream_varint(context->buffer.stream, context->buffer.size + mcp_length_varlong(0));
-            mcp_encode_stream_varint(context->buffer.stream, 0);
+            mcp_encode_stream_varint(context->buffer.size + mcp_length_varlong(0), context->buffer.stream);
+            mcp_encode_stream_varint(0, context->buffer.stream);
         }
     } else {
         mcp_encode_stream_varint(context->buffer.size, context->buffer.stream);
