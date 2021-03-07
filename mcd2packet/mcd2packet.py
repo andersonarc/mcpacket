@@ -1314,7 +1314,7 @@ class packet:
             f"void mcp_encode_{self.postfix}({self.class_name}* this, mcp_buffer_t* dest) {{",
             f"{indent}size_t {packet_length_variable};",
             *tmp,
-            f"{indent}mcp_length_{self.postfix}(this, &{packet_length_variable});"
+            f"{indent}mcp_length_{self.postfix}(this, &{packet_length_variable});",
             f"{indent}mcp_buffer_allocate(dest, {packet_length_variable});",
             f"{indent}mcp_encode_varint(this->mcpacket.id, dest);",
             *fields,

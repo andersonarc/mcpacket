@@ -1,8 +1,8 @@
 /**
  * @file connection.c
  * @author andersonarc (e.andersonarc@gmail.com)
- * @brief packet input/output functions implemenatation
- * @version 0.1
+ * @brief packet input/output functions implemenatations
+ * @version 0.2
  * @date 2021-03-06
  */
     /* includes */
@@ -21,10 +21,25 @@
 void mcp_receive(mcp_context_t* context) {
     size_t length = mcp_decode_stream_varint(context->buffer.stream);
     if (context->compression_threshold > 0) {
-        mcp_handler_execute_compressed(context, length);
+        size_t uncompressed_size = mcp_decode_stream_varint(context->buffer.stream);
+        size_t compressed_size = length - mcp_length_varlong(uncompressed_size);
+        if (uncompressed_size == 0) {
+            mcp_buffer_allocate(&context->buffer, compressed_size);
+            mcp_buffer_init(&context->buffer);
+        } else {
+            char* compressed = malloc(sizeof(char*) * compressed_size);
+            mcp_stream_read(context->buffer.stream, compressed, compressed_size);
+            mcp_buffer_allocate(&context->buffer, uncompressed_size);
+            uncompress((Bytef*) &context->buffer.data, (uLongf*) &uncompressed_size, (Bytef*) compressed, (uLong) compressed_size);
+            free(compressed);
+        }
     } else {
-        mcp_handler_execute_uncompressed(context, length);
+        mcp_buffer_allocate(&context->buffer, length);
+        mcp_buffer_init(&context->buffer);
     }
+    mcp_handler_t* handler = mcp_handler_get(context->state, context->source, mcp_decode_varint(&context->buffer));
+    handler(context);
+    mcp_buffer_free(&context->buffer);
 }
 
 /**
