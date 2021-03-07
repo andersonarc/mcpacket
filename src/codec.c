@@ -8,7 +8,6 @@
  */
       /* includes */
 #include "mcp/codec.h" /* this */
-#include <endian.h> /* byte swap */ 
 #include <string.h> /* string operations */ 
 #include <malloc.h> /* memory allocation */ 
 #include "csafe/assertd.h" /* debug assertions */
@@ -17,11 +16,11 @@
 /**
  * @brief minecraft uuid
  */
-inline void mcp_encode_type_UUID(mcp_type_UUID* this, mcp_buffer_t* dest) {
+void mcp_encode_type_UUID(mcp_type_UUID* this, mcp_buffer_t* dest) {
   mcp_encode_be64(&this->msb, dest);
   mcp_encode_be64(&this->lsb, dest);
 }
-inline void mcp_decode_type_UUID(mcp_type_UUID* this, mcp_buffer_t* src) {
+void mcp_decode_type_UUID(mcp_type_UUID* this, mcp_buffer_t* src) {
   mcp_decode_be64(&this->msb, src);
   mcp_decode_be64(&this->lsb, src);
 }
@@ -29,7 +28,7 @@ inline void mcp_decode_type_UUID(mcp_type_UUID* this, mcp_buffer_t* src) {
 /**
  * @brief minecraft position
  */
-inline void mcp_encode_type_Position(mcp_type_Position* this, mcp_buffer_t* dest) {
+void mcp_encode_type_Position(mcp_type_Position* this, mcp_buffer_t* dest) {
   uint64_t tmp = (
     ((uint64_t) this->x & 0x3FFFFFFUL) << 38 |
     ((uint64_t) this->z & 0x3FFFFFFUL) << 12 |
@@ -37,7 +36,7 @@ inline void mcp_encode_type_Position(mcp_type_Position* this, mcp_buffer_t* dest
   );
   mcp_encode_be64(&tmp, dest);
 }
-inline void mcp_decode_type_Position(mcp_type_Position* this, mcp_buffer_t* src) {
+void mcp_decode_type_Position(mcp_type_Position* this, mcp_buffer_t* src) {
   uint64_t tmp;
   mcp_decode_be64(&tmp, src);
   if((this->x = tmp >> 38) & (1UL << 25))
@@ -156,7 +155,8 @@ void mcp_encode_type_Tag(mcp_type_Tag* this, mcp_buffer_t* dest) {
     mcp_encode_varint(this->entries.data[i], dest);
   }
 }
-MALLOC void mcp_decode_type_Tag(mcp_type_Tag* this, mcp_buffer_t* src) { //todo deal with memory leaks (in handlers? generate code for each packet to dealloc?)
+MALLOC void mcp_decode_type_Tag(mcp_type_Tag* this, mcp_buffer_t* src) { 
+  //todo deal with memory leaks (in handlers? generate code for each packet to dealloc?)
 //todo FREE function for each MALLOC function
   mcp_decode_string(&this->tag_name, src);
   this->entries.size = mcp_decode_varint(src);
@@ -358,147 +358,6 @@ void mcp_decode_type_EntityMetadata(mcp_type_EntityMetadata* this, mcp_buffer_t*
 }
 
 /**
- * @brief byte
- */
-inline void mcp_encode_byte(uint8_t* this, mcp_buffer_t* dest) {
-  mcp_buffer_write(dest, (char*) this, SINGLE_BYTE);
-}
-inline void mcp_decode_byte(uint8_t* this, mcp_buffer_t* src) {
-  mcp_buffer_read(src, (char*) this, SINGLE_BYTE);
-}
-
-/**
- * @brief big endian uint16
- */
-inline void mcp_encode_be16(uint16_t* this, mcp_buffer_t* dest) {
-  uint16_t tmp = htobe16(*this);
-  mcp_buffer_write_variable(dest, tmp);
-}
-inline void mcp_decode_be16(uint16_t* this, mcp_buffer_t* src) {
-  uint16_t tmp;
-  mcp_buffer_read_variable(src, tmp);
-  *this = be16toh(tmp);
-}
-
-/**
- * @brief little endian uint16
- */
-inline void mcp_encode_le16(uint16_t* this, mcp_buffer_t* dest) {
-  uint16_t tmp = htole16(*this);
-  mcp_buffer_write_variable(dest, tmp);
-}
-inline void mcp_decode_le16(uint16_t* this, mcp_buffer_t* src) {
-  uint16_t tmp;
-  mcp_buffer_read_variable(src, tmp);
-  *this = le16toh(tmp);
-}
-
-/**
- * @brief big endian uint32
- */
-inline void mcp_encode_be32(uint32_t* this, mcp_buffer_t* dest) {
-  uint32_t tmp = htobe32(*this);
-  mcp_buffer_write_variable(dest, tmp);
-}
-inline void mcp_decode_be32(uint32_t* this, mcp_buffer_t* src) {
-  uint32_t tmp;
-  mcp_buffer_read_variable(src, tmp);
-  *this = be32toh(tmp);
-}
-
-/**
- * @brief little endian uint32
- */
-inline void mcp_encode_le32(uint32_t* this, mcp_buffer_t* dest) {
-  uint32_t tmp = htole32(*this);
-  mcp_buffer_write_variable(dest, tmp);
-}
-inline void mcp_decode_le32(uint32_t* this, mcp_buffer_t* src) {
-  uint32_t tmp;
-  mcp_buffer_read_variable(src, tmp);
-  *this = le32toh(tmp);
-}
-
-/**
- * @brief big endian uint64
- */
-inline void mcp_encode_be64(uint64_t* this, mcp_buffer_t* dest) {
-  uint64_t tmp = htobe64(*this);
-  mcp_buffer_write_variable(dest, tmp);
-}
-inline void mcp_decode_be64(uint64_t* this, mcp_buffer_t* src) {
-  uint64_t tmp;
-  mcp_buffer_read_variable(src, tmp);
-  *this = be64toh(tmp);
-}
-
-/**
- * @brief little endian uint64
- */
-inline void mcp_encode_le64(uint64_t* this, mcp_buffer_t* dest) {
-  uint64_t tmp = htole64(*this);
-  mcp_buffer_write_variable(dest, tmp);
-}
-inline void mcp_decode_le64(uint64_t* this, mcp_buffer_t* src) {
-  uint64_t tmp;
-  mcp_buffer_read_variable(src, tmp);
-  *this = le64toh(tmp);
-}
-
-/**
- * @brief big endian float32
- */
-inline void mcp_encode_bef32(float* this, mcp_buffer_t* dest) {
-  uint32_t tmp = htobe32((uint32_t) *this);
-  mcp_buffer_write_variable(dest, tmp);
-}
-inline void mcp_decode_bef32(float* this, mcp_buffer_t* src) {
-  uint32_t tmp;
-  mcp_buffer_read_variable(src, tmp);
-  *this = (float) be32toh(tmp);
-}
-
-/**
- * @brief little endian float32
- */
-inline void mcp_encode_lef32(float* this, mcp_buffer_t* dest) {
-  uint32_t tmp = htole32((uint32_t) *this);
-  mcp_buffer_write_variable(dest, tmp);
-}
-
-inline void mcp_decode_lef32(float* this, mcp_buffer_t* src) {
-  uint32_t tmp;
-  mcp_buffer_read_variable(src, tmp);
-  *this = (float) le32toh(tmp);
-}
-
-/**
- * @brief big endian float64
- */
-inline void mcp_encode_bef64(double* this, mcp_buffer_t* dest) {
-  uint64_t tmp = htobe64((uint64_t) *this);
-  mcp_buffer_write_variable(dest, tmp);
-}
-inline void mcp_decode_bef64(double* this, mcp_buffer_t* src) {
-  uint64_t tmp;
-  mcp_buffer_read_variable(src, tmp);
-  *this = (double) be64toh(tmp);
-}
-
-/**
- * @brief little endian float64
- */
-inline void mcp_encode_lef64(double* this, mcp_buffer_t* dest) {
-  uint64_t tmp = htole64((uint64_t) *this);
-  mcp_buffer_write_variable(dest, tmp);
-}
-inline void mcp_decode_lef64(double* this, mcp_buffer_t* src) {
-  uint64_t tmp;
-  mcp_buffer_read_variable(src, tmp);
-  *this = (double) le64toh(tmp);
-}
-
-/**
  * @brief string
  */
 void mcp_encode_string(char** this, mcp_buffer_t* dest) {
@@ -512,22 +371,6 @@ MALLOC void mcp_decode_string(char** this, mcp_buffer_t* src) {
   mcp_buffer_read(src, string, length);
   string[length] = 0;
   *this = string;
-}
-inline size_t mcp_length_string(const char* src) {
-  size_t length = strlen(src);
-  return mcp_length_varlong(length) + length;
-}
-
-/**
- * @brief buffer
- */
-inline void mcp_encode_buffer(char_vector_t* this, mcp_buffer_t* dest) {
-  mcp_buffer_write(dest, this->data, this->size);
-}
-inline void mcp_decode_buffer(char_vector_t* this, size_t length, mcp_buffer_t* src) {
-  this->size = length;
-  this->data = malloc(sizeof(char) * length);
-  mcp_buffer_read(src, this->data, this->size);
 }
 
 /**
@@ -552,41 +395,6 @@ uint64_t mcp_decode_varint(mcp_buffer_t* src) {
     i += 7;
   } while (j & 0b10000000);
   return dest;
-}
-/**
- * @brief calculate varnum size for fixed integer
- */
-inline size_t mcp_length_varint(uint32_t varint) {
-  if(varint < (1 << 7))
-    return 1;
-  if(varint < (1 << 14))
-    return 2;
-  if(varint < (1 << 21))
-    return 3;
-  if(varint < (1 << 28))
-    return 4;
-  return 5;
-}
-inline size_t mcp_length_varlong(uint64_t varlong) {
-  if(varlong < (1 << 7))
-    return 1;
-  if(varlong < (1 << 14))
-    return 2;
-  if(varlong < (1 << 21))
-    return 3;
-  if(varlong < (1 << 28))
-    return 4;
-  if(varlong < (1ULL << 35))
-    return 5;
-  if(varlong < (1ULL << 42))
-    return 6;
-  if(varlong < (1ULL << 49))
-    return 7;
-  if(varlong < (1ULL << 56))
-    return 8;
-  if(varlong < (1ULL << 63))
-    return 9;
-  return 10;
 }
 
 /**
