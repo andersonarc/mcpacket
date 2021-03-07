@@ -377,20 +377,20 @@ MALLOC void mcp_decode_string(char** this, mcp_buffer_t* src) {
  * @brief variable sized number
  */
 void mcp_encode_varint(uint64_t src, mcp_buffer_t* dest) {
-  uint64_t tmp;
   for(; src >= 0x80; src >>= 7) {
-    tmp = 0x80 | (src & 0x7F);
-    mcp_buffer_write(dest, (char*) &tmp, SINGLE_BYTE);
+    mcp_buffer_current(dest) = (char) 0x80 | (src & 0x7F);
+    mcp_buffer_increment(dest, 1);
   }
-  tmp = src & 0x7F;
-  mcp_buffer_write(dest, (char*) &tmp, SINGLE_BYTE);
+  mcp_buffer_current(dest) = (char) src & 0x7F;
+  mcp_buffer_increment(dest, 1);
 }
 uint64_t mcp_decode_varint(mcp_buffer_t* src) {
   int i = 0;
   char j;
   uint64_t dest = 0;
   do {
-    mcp_buffer_read(src, &j, SINGLE_BYTE);
+    j = mcp_buffer_current(src);
+    mcp_buffer_increment(src, 1);
     dest |= ((j & 0b01111111) << i);
     i += 7;
   } while (j & 0b10000000);

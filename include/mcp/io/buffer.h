@@ -27,7 +27,29 @@ typedef struct mcp_buffer_t {
     char* data;
 } mcp_buffer_t;
 
+//todo defines to inline functions
+
+    /* defines */
+/**
+ * @brief get a pointer to a current index in a buffer
+ * 
+ * @param buffer pointer to the buffer
+ * 
+ * @warning it's the caller's responsibility to increase buffer index after modification
+ */
+#define mcp_buffer_current(buffer) buffer->data[buffer->index]
+
     /* functions */
+/**
+ * @brief increase buffer's index
+ * 
+ * @param buffer pointer to the buffer
+ * @param count  number of bytes to increase for
+ */
+static inline void mcp_buffer_increment(mcp_buffer_t* buffer, size_t count) {
+    buffer->index += count;
+}
+
 /**
  * @brief bind a buffer to a stream
  *
@@ -119,31 +141,5 @@ static inline void mcp_buffer_read(mcp_buffer_t* buffer, char* dest, size_t coun
     memcpy(dest, &(buffer->data[buffer->index]), count);
     buffer->index += count;
 }
-
-    /* defines */
-    //todo defines to inline functions
-/**
- * @brief get a pointer to a place in a buffer for a variable of specified type
- * 
- * @param buffer   pointer to the buffer
- * @param type     variable type
- */
-#define mcp_buffer_get_pointer(buffer, type) ((type*) buffer->data)[buffer->index]
-
-/**
- * @brief write a variable to a buffer
- * 
- * @param buffer   pointer to the buffer
- * @param variable variable to write from
- */
-#define mcp_buffer_write_variable(buffer, variable) mcp_buffer_write(buffer, (char*) &(variable), sizeof(variable))
-
-/**
- * @brief read a variable from a buffer
- * 
- * @param buffer   pointer to the buffer
- * @param variable variable to read into
- */
-#define mcp_buffer_read_variable(buffer, variable) mcp_buffer_read(buffer, (char*) &(variable), sizeof(variable))
 
 #endif /* MCP_IO_BUFFER_H */

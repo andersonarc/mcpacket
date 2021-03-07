@@ -66,20 +66,24 @@ void mcp_decode_type_EntityMetadata(mcp_type_EntityMetadata* this, mcp_buffer_t*
 /**
  * @brief utility macro for creating simple encoders/decoders
  */
-#define __mcp_number(type, postfix, encode_converter, decode_converter) \
-static inline void mcp_encode_##postfix(type* this, mcp_buffer_t* dest) {    \
-  mcp_buffer_get_pointer(dest, type) = encode_converter(*this);       \
-}                                                                       \
-static inline void mcp_decode_##postfix(type* this, mcp_buffer_t* src) {     \
-  *this = decode_converter(mcp_buffer_get_pointer(src, type));        \
+#define __mcp_number(type, postfix, encode_converter, decode_converter)   \
+static inline void mcp_encode_##postfix(type* this, mcp_buffer_t* dest) { \
+  mcp_buffer_current(dest) = encode_converter(*this);           \
+  mcp_buffer_increment(dest, sizeof(type));                               \
+}                                                                         \
+static inline void mcp_decode_##postfix(type* this, mcp_buffer_t* src) {  \
+  *this = decode_converter(mcp_buffer_current(src));            \
+  mcp_buffer_increment(src, sizeof(type));                               \
 }   
 
 #define __mcp_number_a(type, actual, postfix, encode_converter, decode_converter) \
-static inline void mcp_encode_##postfix(type* this, mcp_buffer_t* dest) {              \
-  mcp_buffer_get_pointer(dest, actual) = encode_converter((actual) *this);      \
+static inline void mcp_encode_##postfix(type* this, mcp_buffer_t* dest) {         \
+  mcp_buffer_current(dest) = encode_converter((actual) *this);        \
+  mcp_buffer_increment(dest, sizeof(actual));                                     \
 }                                                                                 \
-static inline void mcp_decode_##postfix(type* this, mcp_buffer_t* src) {               \
-  *this = (type) decode_converter(mcp_buffer_get_pointer(src, actual));         \
+static inline void mcp_decode_##postfix(type* this, mcp_buffer_t* src) {          \
+  *this = (type) decode_converter(mcp_buffer_current(src));           \
+  mcp_buffer_increment(src, sizeof(actual));                                     \
 }   
 
 
