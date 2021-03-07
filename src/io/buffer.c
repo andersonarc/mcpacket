@@ -2,7 +2,7 @@
  * @file buffer.c
  * @author andersonarc (e.andersonarc@gmail.com)
  * @brief buffered io stream
- * @version 0.3
+ * @version 0.4
  * @date 2021-02-14
  */
     /* includes */
@@ -83,7 +83,7 @@ void mcp_buffer_flush(mcp_buffer_t* buffer) {
  * 
  * @warning use with caution, segmentation fault is possible
  */
-void mcp_buffer_write(mcp_buffer_t* buffer, void* src, size_t count) {
+void mcp_buffer_write(mcp_buffer_t* buffer, char* src, size_t count) {
     memcpy(&(buffer->data[buffer->index]), src, count);
     buffer->index += count;
 }
@@ -98,7 +98,7 @@ void mcp_buffer_write(mcp_buffer_t* buffer, void* src, size_t count) {
  * @warning buffer overflow is possible
  * @warning use with caution, segmentation fault is possible
  */
-void mcp_buffer_read(mcp_buffer_t* buffer, void* dest, size_t count) {
+void mcp_buffer_read(mcp_buffer_t* buffer, char* dest, size_t count) {
     memcpy(dest, &(buffer->data[buffer->index]), count);
     buffer->index += count;
 }

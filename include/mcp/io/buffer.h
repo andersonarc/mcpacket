@@ -2,7 +2,7 @@
  * @file buffer.h
  * @author andersonarc (e.andersonarc@gmail.com)
  * @brief buffered io stream
- * @version 0.3
+ * @version 0.4
  * @date 2021-02-08
  */
     /* header guard */
@@ -65,14 +65,14 @@ void mcp_buffer_init(mcp_buffer_t* buffer);
  * 
  * @warning it's the caller's responsibility to flush the buffer/close the stream
  */
-void mcp_buffer_free(mcp_buffer_t* buffer); //todo return status
+void mcp_buffer_free(mcp_buffer_t* buffer);
 
 /**
  * @brief flush a buffer into bound stream
  * 
- * @param buffer the buffer
+ * @param buffer pointer to the buffer
  */
-void mcp_buffer_flush(mcp_buffer_t* buffer); //todo return status
+void mcp_buffer_flush(mcp_buffer_t* buffer);
 
 /**
  * @brief write to a buffer
@@ -83,7 +83,7 @@ void mcp_buffer_flush(mcp_buffer_t* buffer); //todo return status
  * 
  * @warning use with caution, segmentation fault is possible
  */
-void mcp_buffer_write(mcp_buffer_t* buffer, void* src, size_t count); //todo return status?
+void mcp_buffer_write(mcp_buffer_t* buffer, char* src, size_t count);
 
 /**
  * @brief read from a buffer
@@ -95,7 +95,7 @@ void mcp_buffer_write(mcp_buffer_t* buffer, void* src, size_t count); //todo ret
  * @warning buffer overflow is possible
  * @warning use with caution, segmentation fault is possible
  */
-void mcp_buffer_read(mcp_buffer_t* buffer, void* dest, size_t count); //todo return status?
+void mcp_buffer_read(mcp_buffer_t* buffer, char* dest, size_t count);
 
     /* defines */
 /**
@@ -104,7 +104,7 @@ void mcp_buffer_read(mcp_buffer_t* buffer, void* dest, size_t count); //todo ret
  * @param buffer   pointer to the buffer
  * @param variable variable to write from
  */
-#define mcp_buffer_write_variable(buffer, variable) mcp_buffer_write(buffer, &(variable), sizeof(variable))
+#define mcp_buffer_write_variable(buffer, variable) mcp_buffer_write(buffer, (char*) &(variable), sizeof(variable))
 
 /**
  * @brief read a variable from a stream
@@ -112,6 +112,6 @@ void mcp_buffer_read(mcp_buffer_t* buffer, void* dest, size_t count); //todo ret
  * @param buffer   pointer to the buffer
  * @param variable variable to read into
  */
-#define mcp_buffer_read_variable(buffer, variable) mcp_buffer_read(buffer, &(variable), sizeof(variable))
+#define mcp_buffer_read_variable(buffer, variable) mcp_buffer_read(buffer, (char*) &(variable), sizeof(variable))
 
 #endif /* MCP_IO_BUFFER_H */

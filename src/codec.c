@@ -361,10 +361,10 @@ void mcp_decode_type_EntityMetadata(mcp_type_EntityMetadata* this, mcp_buffer_t*
  * @brief byte
  */
 void mcp_encode_byte(uint8_t* this, mcp_buffer_t* dest) {
-  mcp_buffer_write(dest, this, SINGLE_BYTE);
+  mcp_buffer_write(dest, (char*) this, SINGLE_BYTE);
 }
 void mcp_decode_byte(uint8_t* this, mcp_buffer_t* src) {
-  mcp_buffer_read(src, this, SINGLE_BYTE);
+  mcp_buffer_read(src, (char*) this, SINGLE_BYTE);
 }
 
 /**
@@ -537,18 +537,18 @@ void mcp_encode_varint(uint64_t src, mcp_buffer_t* dest) {
   uint64_t tmp;
   for(; src >= 0x80; src >>= 7) {
     tmp = 0x80 | (src & 0x7F);
-    mcp_buffer_write(dest, &tmp, SINGLE_BYTE);
+    mcp_buffer_write(dest, (char*) &tmp, SINGLE_BYTE);
   }
   tmp = src & 0x7F;
-  mcp_buffer_write(dest, &tmp, SINGLE_BYTE);
+  mcp_buffer_write(dest, (char*) &tmp, SINGLE_BYTE);
 }
 uint64_t mcp_decode_varint(mcp_buffer_t* src) {
   int i = 0;
-  uint64_t j = 0;
+  uint8_t j = 0;
   uint64_t dest = 0;
-  mcp_buffer_read(src, &j, SINGLE_BYTE);
+  mcp_buffer_read(src, (char*) &j, SINGLE_BYTE);
   for(; j & 0x80; i += 7) {
-    mcp_buffer_read(src, &j, SINGLE_BYTE);
+    mcp_buffer_read(src, (char*) &j, SINGLE_BYTE);
     dest |= (j & 0x7F) << i;
   }
   return dest | j << i;
@@ -561,18 +561,18 @@ void mcp_encode_stream_varint(uint64_t src, mcp_stream_t dest) {
   uint64_t tmp;
   for(; src >= 0x80; src >>= 7) {
     tmp = 0x80 | (src & 0x7F);
-    mcp_stream_write(dest, &tmp, SINGLE_BYTE);
+    mcp_stream_write(dest, (char*) &tmp, SINGLE_BYTE);
   }
   tmp = src & 0x7F;
-  mcp_stream_write(dest, &tmp, SINGLE_BYTE);
+  mcp_stream_write(dest, (char*) &tmp, SINGLE_BYTE);
 }
 uint64_t mcp_decode_stream_varint(mcp_stream_t src) {
   int i = 0;
-  uint64_t j = 0;
+  uint8_t j = 0;
   uint64_t dest = 0;
-  mcp_stream_read(src, &j, SINGLE_BYTE);
+  mcp_stream_read(src, (char*) &j, SINGLE_BYTE);
   for(; j & 0x80; i += 7) {
-    mcp_stream_read(src, &j, SINGLE_BYTE);
+    mcp_stream_read(src, (char*) &j, SINGLE_BYTE);
     dest |= (j & 0x7F) << i;
   }
   return dest | j << i;

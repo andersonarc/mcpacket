@@ -27,10 +27,10 @@ void mcp_receive(mcp_context_t* context) {
             mcp_buffer_allocate(&context->buffer, compressed_size);
             mcp_buffer_init(&context->buffer);
         } else {
-            char* compressed = malloc(sizeof(char*) * compressed_size);
+            char* compressed = malloc(sizeof(char) * compressed_size);
             mcp_stream_read(context->buffer.stream, compressed, compressed_size);
             mcp_buffer_allocate(&context->buffer, uncompressed_size);
-            uncompress((Bytef*) &context->buffer.data, (uLongf*) &uncompressed_size, (Bytef*) compressed, (uLong) compressed_size);
+            uncompress((Bytef*) context->buffer.data, (uLongf*) &uncompressed_size, (Bytef*) compressed, (uLong) compressed_size);
             free(compressed);
         }
     } else {
