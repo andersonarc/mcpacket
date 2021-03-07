@@ -18,13 +18,13 @@
  * @param count  number of bytes to write
  */
 void mcp_stream_write(mcp_stream_t stream, char* src, size_t count) {
-    size_t written = write(stream, src, count);
+    ssize_t written = write(stream, src, count);
     assertd_false_custom("mcp_stream_write", written < 0, "unable to write into a stream");
     if (written == count) {
         return;
     } else {
-        while (written != count) {
-            written += write(stream, src, count);
+        while (written < count) {
+            written += write(stream, src, count - written);
         }
     }
 }
@@ -37,13 +37,13 @@ void mcp_stream_write(mcp_stream_t stream, char* src, size_t count) {
  * @param count  number of bytes to read
  */
 void mcp_stream_read(mcp_stream_t stream, char* dest, size_t count) {
-    size_t received = read(stream, dest, count);
+    ssize_t received = read(stream, dest, count);
     assertd_false_custom("mcp_stream_read", received < 0, "unable to read from a stream");
     if (received == count) {
         return;
     } else {
-        while (received != count) {
-            received += read(stream, dest, count);
+        while (received < count) {
+            received += read(stream, dest, count - received);
         }
     }
 }
