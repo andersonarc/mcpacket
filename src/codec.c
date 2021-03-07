@@ -12,6 +12,7 @@
 #include <string.h> /* string operations */ 
 #include <malloc.h> /* memory allocation */ 
 #include "mcp/varnum.h" /* varnum size */
+#include "csafe/assertd.h" /* debug assertions */
 
       /* functions */
 /**
@@ -544,14 +545,14 @@ void mcp_encode_varint(uint64_t src, mcp_buffer_t* dest) {
 }
 uint64_t mcp_decode_varint(mcp_buffer_t* src) {
   int i = 0;
-  uint8_t j = 0;
+  char j;
   uint64_t dest = 0;
-  mcp_buffer_read(src, (char*) &j, SINGLE_BYTE);
-  for(; j & 0x80; i += 7) {
-    mcp_buffer_read(src, (char*) &j, SINGLE_BYTE);
-    dest |= (j & 0x7F) << i;
-  }
-  return dest | j << i;
+  do {
+    mcp_buffer_read(src, &j, SINGLE_BYTE);
+    dest |= ((j & 0b01111111) << i);
+    i += 7;
+  } while (j & 0b10000000);
+  return dest;
 }
 
 /**
@@ -568,14 +569,14 @@ void mcp_encode_stream_varint(uint64_t src, mcp_stream_t dest) {
 }
 uint64_t mcp_decode_stream_varint(mcp_stream_t src) {
   int i = 0;
-  uint8_t j = 0;
+  char j;
   uint64_t dest = 0;
-  mcp_stream_read(src, (char*) &j, SINGLE_BYTE);
-  for(; j & 0x80; i += 7) {
-    mcp_stream_read(src, (char*) &j, SINGLE_BYTE);
-    dest |= (j & 0x7F) << i;
-  }
-  return dest | j << i;
+  do {
+    mcp_stream_read(src, &j, SINGLE_BYTE);
+    dest |= ((j & 0b01111111) << i);
+    i += 7;
+  } while (j & 0b10000000);
+  return dest;
 }
 
 /**
