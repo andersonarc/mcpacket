@@ -2,7 +2,7 @@
  * @file stream.c
  * @author andersonarc (e.andersonarc@gmail.com)
  * @brief stream io
- * @version 0.1
+ * @version 0.3
  * @date 2021-03-07
  */
     /* includes */
@@ -24,7 +24,7 @@ void mcp_stream_write(mcp_stream_t stream, char* src, size_t count) {
         return;
     } else {
         while (written < count) {
-            written += write(stream, src, count - written);
+            written += write(stream, &(src[written]), count - written);
         }
     }
 }
@@ -43,7 +43,7 @@ void mcp_stream_read(mcp_stream_t stream, char* dest, size_t count) {
         return;
     } else {
         while (received < count) {
-            received += read(stream, dest, count - received);
+            received += read(stream, &(dest[received]), count - received);
         }
     }
 }

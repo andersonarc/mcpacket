@@ -13,37 +13,22 @@
 #include "mcp/protocol.h"   /* protocol */
 
     /* defines */
+    //todo safe debug variants for these
 /**
  * @brief get a handler for a packet
  * 
- * @warning very unsafe, throws segmentation fault on error/corrupts the stream silently when reading
+ * @warning unsafe, throws segmentation fault on error/corrupts the stream silently when reading
  */
 #define mcp_handler_get(state, source, id) mcp_protocol_handlers[state][source][id]
 
 /**
  * @brief set a handler for a packet
  * 
- * @warning very unsafe, throws segmentation fault on error/corrupts the stream silently when reading
+ * @warning unsafe, throws segmentation fault on error/corrupts the stream silently when reading
  */
 #define mcp_handler_set(state, source, id, handler) mcp_protocol_handlers[state][source][id] = handler
 
     /* functions */
-/**
- * @brief read a packet from a buffered stream and handle it with a globally specified handler
- * 
- * @param context connection context
- * @param length full packet length
- */
-void mcp_handler_execute_uncompressed(mcp_context_t* context, size_t length);
-
-/**
- * @brief read and decompress a packet from a buffered stream and handle it with a globally specified handler
- * 
- * @param context connection context
- * @param length full packet length
- */
-void mcp_handler_execute_compressed(mcp_context_t* context, size_t length);
-
 /**
  * @brief blank packet handler
  * 

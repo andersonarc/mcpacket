@@ -2,7 +2,7 @@
  * @file buffer.h
  * @author andersonarc (e.andersonarc@gmail.com)
  * @brief buffered io stream
- * @version 0.4
+ * @version 0.5
  * @date 2021-02-08
  */
     /* header guard */
@@ -32,7 +32,7 @@ typedef struct mcp_buffer_t {
  * @param buffer pointer to the buffer
  * @param size   buffer size
  */
-void mcp_buffer_bind(mcp_buffer_t* buffer, mcp_stream_t stream);
+inline void mcp_buffer_bind(mcp_buffer_t* buffer, mcp_stream_t stream);
 
 /**
  * @brief allocate a buffer
@@ -40,7 +40,7 @@ void mcp_buffer_bind(mcp_buffer_t* buffer, mcp_stream_t stream);
  * @param buffer pointer to the buffer
  * @param size   buffer size
  */
-MALLOC void mcp_buffer_allocate(mcp_buffer_t* buffer, size_t size); //todo return status
+MALLOC inline void mcp_buffer_allocate(mcp_buffer_t* buffer, size_t size); //todo return status
 
 /**
  * @brief set already allocated data for a buffer
@@ -49,14 +49,14 @@ MALLOC void mcp_buffer_allocate(mcp_buffer_t* buffer, size_t size); //todo retur
  * @param data   data value
  * @param size   data size
  */
-void mcp_buffer_set(mcp_buffer_t* buffer, char* data, size_t size);
+inline void mcp_buffer_set(mcp_buffer_t* buffer, char* data, size_t size);
 
 /**
  * @brief initialize a buffer
  * 
  * @param buffer pointer to the buffer
  */
-void mcp_buffer_init(mcp_buffer_t* buffer);
+inline void mcp_buffer_init(mcp_buffer_t* buffer);
 
 /**
  * @brief free a buffer
@@ -65,14 +65,14 @@ void mcp_buffer_init(mcp_buffer_t* buffer);
  * 
  * @warning it's the caller's responsibility to flush the buffer/close the stream
  */
-void mcp_buffer_free(mcp_buffer_t* buffer);
+inline void mcp_buffer_free(mcp_buffer_t* buffer);
 
 /**
  * @brief flush a buffer into bound stream
  * 
  * @param buffer pointer to the buffer
  */
-void mcp_buffer_flush(mcp_buffer_t* buffer);
+inline void mcp_buffer_flush(mcp_buffer_t* buffer);
 
 /**
  * @brief write to a buffer
@@ -83,7 +83,7 @@ void mcp_buffer_flush(mcp_buffer_t* buffer);
  * 
  * @warning use with caution, segmentation fault is possible
  */
-void mcp_buffer_write(mcp_buffer_t* buffer, char* src, size_t count);
+inline void mcp_buffer_write(mcp_buffer_t* buffer, char* src, size_t count);
 
 /**
  * @brief read from a buffer
@@ -95,7 +95,7 @@ void mcp_buffer_write(mcp_buffer_t* buffer, char* src, size_t count);
  * @warning buffer overflow is possible
  * @warning use with caution, segmentation fault is possible
  */
-void mcp_buffer_read(mcp_buffer_t* buffer, char* dest, size_t count);
+inline void mcp_buffer_read(mcp_buffer_t* buffer, char* dest, size_t count);
 
     /* defines */
 /**

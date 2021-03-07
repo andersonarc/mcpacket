@@ -1448,7 +1448,6 @@ def run(version):
         "#include <string.h>",
         "#include \"mcp/protocol.h\"",
         "#include \"mcp/handler.h\"",
-        "#include \"mcp/varnum.h\"",
         "#include \"mcp/codec.h\"",
         ""
     ]

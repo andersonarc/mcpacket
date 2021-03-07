@@ -6,11 +6,7 @@
  * @date 2021-01-29
  */
     /* includes */
-#include <stdlib.h>      /* memory functions */
-#include <zlib.h>        /* uncompress packets */
 #include "mcp/handler.h" /* this */
-#include "mcp/codec.h"   /* encoders/decoders */
-#include "mcp/varnum.h"  /* varnum size */
 
     /* functions */
 /**

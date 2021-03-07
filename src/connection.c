@@ -9,7 +9,6 @@
 #include "mcp/connection.h" /* this */
 #include "mcp/handler.h"    /* packet handlers */
 #include "mcp/codec.h"      /* encoders */
-#include "mcp/varnum.h"     /* varnum length */
 #include <stdlib.h>         /* realloc */
 
     /* functions */

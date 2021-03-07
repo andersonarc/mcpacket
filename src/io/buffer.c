@@ -2,7 +2,7 @@
  * @file buffer.c
  * @author andersonarc (e.andersonarc@gmail.com)
  * @brief buffered io stream
- * @version 0.4
+ * @version 0.5
  * @date 2021-02-14
  */
     /* includes */
@@ -17,7 +17,7 @@
  * @param buffer pointer to the buffer
  * @param size   buffer size
  */
-void mcp_buffer_bind(mcp_buffer_t* buffer, mcp_stream_t stream) {
+inline void mcp_buffer_bind(mcp_buffer_t* buffer, mcp_stream_t stream) {
     buffer->stream = stream;
 }
 
@@ -27,7 +27,7 @@ void mcp_buffer_bind(mcp_buffer_t* buffer, mcp_stream_t stream) {
  * @param buffer pointer to the buffer
  * @param size   buffer size
  */
-MALLOC void mcp_buffer_allocate(mcp_buffer_t* buffer, size_t size) {
+MALLOC inline void mcp_buffer_allocate(mcp_buffer_t* buffer, size_t size) {
     buffer->data = malloc(sizeof(char) * size);
     buffer->size = size;
     buffer->index = 0;
@@ -40,7 +40,7 @@ MALLOC void mcp_buffer_allocate(mcp_buffer_t* buffer, size_t size) {
  * @param data   data value
  * @param size   data size
  */
-void mcp_buffer_set(mcp_buffer_t* buffer, char* data, size_t size) {
+inline void mcp_buffer_set(mcp_buffer_t* buffer, char* data, size_t size) {
     buffer->data = data;
     buffer->size = size;
 }
@@ -50,7 +50,7 @@ void mcp_buffer_set(mcp_buffer_t* buffer, char* data, size_t size) {
  * 
  * @param buffer pointer to the buffer
  */
-void mcp_buffer_init(mcp_buffer_t* buffer) {
+inline void mcp_buffer_init(mcp_buffer_t* buffer) {
     mcp_stream_read(buffer->stream, buffer->data, buffer->size);
 }
 
@@ -61,7 +61,7 @@ void mcp_buffer_init(mcp_buffer_t* buffer) {
  * 
  * @warning it's the caller's responsibility to flush the buffer/close the stream
  */
-void mcp_buffer_free(mcp_buffer_t* buffer) {
+inline void mcp_buffer_free(mcp_buffer_t* buffer) {
     free(buffer->data);
 }
 
@@ -70,7 +70,7 @@ void mcp_buffer_free(mcp_buffer_t* buffer) {
  * 
  * @param buffer the buffer
  */
-void mcp_buffer_flush(mcp_buffer_t* buffer) {
+inline void mcp_buffer_flush(mcp_buffer_t* buffer) {
     mcp_stream_write(buffer->stream, buffer->data, buffer->size);
 }
 
@@ -83,7 +83,7 @@ void mcp_buffer_flush(mcp_buffer_t* buffer) {
  * 
  * @warning use with caution, segmentation fault is possible
  */
-void mcp_buffer_write(mcp_buffer_t* buffer, char* src, size_t count) {
+inline void mcp_buffer_write(mcp_buffer_t* buffer, char* src, size_t count) {
     memcpy(&(buffer->data[buffer->index]), src, count);
     buffer->index += count;
 }
@@ -98,7 +98,7 @@ void mcp_buffer_write(mcp_buffer_t* buffer, char* src, size_t count) {
  * @warning buffer overflow is possible
  * @warning use with caution, segmentation fault is possible
  */
-void mcp_buffer_read(mcp_buffer_t* buffer, char* dest, size_t count) {
+inline void mcp_buffer_read(mcp_buffer_t* buffer, char* dest, size_t count) {
     memcpy(dest, &(buffer->data[buffer->index]), count);
     buffer->index += count;
 }

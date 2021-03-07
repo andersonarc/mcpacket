@@ -2,7 +2,7 @@
  * @file stream.h
  * @author andersonarc (e.andersonarc@gmail.com)
  * @brief stream io
- * @version 0.2
+ * @version 0.3
  * @date 2021-01-10
  */
     /* header guard */

@@ -2,7 +2,7 @@
 
 # project definition
 project('mcpacket', 'c', 
-    version: '0.8',
+    version: '0.9',
     license: 'GPL3')
 
 # find required programs
@@ -28,7 +28,7 @@ csafe = dependency('csafe',
 zlib = dependency('zlib')
 
 # prepare build files
-src = files('src/handler.c', 'src/codec.c', 'src/io/buffer.c', 'src/io/stream.c', 'src/varnum.c', 'src/connection.c')
+src = files('src/handler.c', 'src/codec.c', 'src/io/buffer.c', 'src/io/stream.c', 'src/connection.c')
 include = include_directories('include')
 
 # compile library
