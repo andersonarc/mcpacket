@@ -2,7 +2,7 @@
  * @file stream.c
  * @author andersonarc (e.andersonarc@gmail.com)
  * @brief stream io
- * @version 0.3
+ * @version 0.4
  * @date 2021-03-07
  */
     /* includes */
@@ -24,7 +24,13 @@ void mcp_stream_write(mcp_stream_t stream, char* src, size_t count) {
         return;
     } else {
         while (written < count) {
-            written += write(stream, &(src[written]), count - written);
+            #ifdef NDEBUG
+                written += write(stream, &src[written], count - written);
+            #else
+                ssize_t currently_written = write(stream, &src[written], count - written);
+                assertd_false_custom("mcp_stream_write", currently_written < 0, "unable to write into a stream");
+                written += currently_written;
+            #endif /* NDEBUG */
         }
     }
 }
@@ -43,7 +49,13 @@ void mcp_stream_read(mcp_stream_t stream, char* dest, size_t count) {
         return;
     } else {
         while (received < count) {
-            received += read(stream, &(dest[received]), count - received);
+            #ifdef NDEBUG
+                received += read(stream, &dest[received], count - received);
+            #else
+                ssize_t currently_received = read(stream, &dest[received], count - received);
+                assertd_false_custom("mcp_stream_write", currently_received < 0, "unable to read from a stream");
+                received += currently_received;
+            #endif /* NDEBUG */
         }
     }
 }

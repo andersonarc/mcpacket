@@ -1,8 +1,8 @@
 /**
  * @file buffer.h
  * @author andersonarc (e.andersonarc@gmail.com)
- * @brief buffered io stream
- * @version 0.5
+ * @brief buffered io
+ * @version 0.6
  * @date 2021-02-08
  */
     /* header guard */
@@ -10,11 +10,9 @@
 #define MCP_IO_BUFFER_H
 
     /* includes */
-#include <stddef.h>        /* size_t */
-#include <memory.h>        /* memory functions  */
-#include <malloc.h>        /* memore allocation */
 #include "mcp/io/stream.h" /* stream io */
-#include "mcp/misc.h"      /* annotations */
+#include <stddef.h>        /* size_t */
+#include <stdlib.h>        /* memory functions */
 
     /* typedefs */
 /**
@@ -27,19 +25,19 @@ typedef struct mcp_buffer_t {
     char* data;
 } mcp_buffer_t;
 
-//todo defines to inline functions
-
-    /* defines */
+    /* functions */
 /**
  * @brief get a pointer to a current index in a buffer
  * 
  * @param buffer pointer to the buffer
  * 
- * @warning it's the caller's responsibility to increase buffer index after modification
+ * @warning buffer index should be increased after modification
+ * @warning wrong usage could lead to buffer overflow
  */
-#define mcp_buffer_current(buffer) buffer->data[buffer->index]
+static inline char* mcp_buffer_current(mcp_buffer_t* buffer) {
+    return &buffer->data[buffer->index];
+}
 
-    /* functions */
 /**
  * @brief increase buffer's index
  * 
@@ -65,15 +63,17 @@ static inline void mcp_buffer_bind(mcp_buffer_t* buffer, mcp_stream_t stream) {
  *
  * @param buffer pointer to the buffer
  * @param size   buffer size
+ * 
+ * @warning buffer should be deallocated with mcp_buffer_free after usage
  */
-MALLOC static inline void mcp_buffer_allocate(mcp_buffer_t* buffer, size_t size) {
-    buffer->data = malloc(sizeof(char) * size);
+static inline void mcp_buffer_allocate(mcp_buffer_t* buffer, size_t size) {
+    buffer->data = malloc(size);
     buffer->size = size;
     buffer->index = 0;
 }
 
 /**
- * @brief set already allocated data for a buffer
+ * @brief assign already allocated data to a buffer
  *
  * @param buffer pointer to the buffer
  * @param data   data value
@@ -85,7 +85,7 @@ static inline void mcp_buffer_set(mcp_buffer_t* buffer, char* data, size_t size)
 }
 
 /**
- * @brief initialize a buffer
+ * @brief initialize a buffer with data from previously bound stream
  * 
  * @param buffer pointer to the buffer
  */
@@ -97,49 +97,18 @@ static inline void mcp_buffer_init(mcp_buffer_t* buffer) {
  * @brief free a buffer
  *
  * @param buffer pointer to the buffer
- * 
- * @warning it's the caller's responsibility to flush the buffer/close the stream
  */
 static inline void mcp_buffer_free(mcp_buffer_t* buffer) {
     free(buffer->data);
 }
 
 /**
- * @brief flush a buffer into bound stream
+ * @brief flush a buffer into previously bound stream
  * 
  * @param buffer the buffer
  */
 static inline void mcp_buffer_flush(mcp_buffer_t* buffer) {
     mcp_stream_write(buffer->stream, buffer->data, buffer->size);
-}
-
-/**
- * @brief write to a buffer
- * 
- * @param buffer pointer to the buffer
- * @param src    data source
- * @param count  number of bytes to write
- * 
- * @warning use with caution, segmentation fault is possible
- */
-static inline void mcp_buffer_write(mcp_buffer_t* buffer, char* src, size_t count) {
-    memcpy(&(buffer->data[buffer->index]), src, count);
-    buffer->index += count;
-}
-
-/**
- * @brief read from a buffer
- * 
- * @param buffer pointer to the buffer
- * @param dest   data destination
- * @param count  number of bytes to write
- * 
- * @warning buffer overflow is possible
- * @warning use with caution, segmentation fault is possible
- */
-static inline void mcp_buffer_read(mcp_buffer_t* buffer, char* dest, size_t count) {
-    memcpy(dest, &(buffer->data[buffer->index]), count);
-    buffer->index += count;
 }
 
 #endif /* MCP_IO_BUFFER_H */

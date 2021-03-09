@@ -10,9 +10,9 @@
 #define MCP_CONNECTION_H
 
     /* includes */
-#include <stdint.h>        /* integer types */
 #include "mcp/io/buffer.h" /* buffered io */
 #include "mcp/type.h"      /* data types */
+#include <stdint.h>        /* integer types */
 
     /* typedefs */
 /**
@@ -36,14 +36,9 @@ typedef enum mcp_state_t {
 } mcp_state_t;
 
 /**
- * @brief packet type
+ * @brief packet id type
  */
-typedef struct mcp_packet_t {
-    mcp_state_t state;
-    mcp_source_t source;
-    int id;
-    char* name;
-} mcp_packet_t;
+typedef uint8_t mcp_packet_id_t;
 
 /**
  * @brief server structure

@@ -11,11 +11,34 @@
 #define MCP_TYPE_H
 
       /* includes */
-#include <stdint.h>         /* integer types */
 #include "mcp/particle.h"   /* particle types */
-#include "mcp/misc.h"       /* miscellanous */
+#include <stdint.h>         /* integer types */
+#include <stdbool.h>        /* boolean type */
 
       /* generic typedefs */
+/**
+ * @brief optional value
+ */
+#define mcp_generic_optional(type)  \
+typedef struct type##_optional_t {  \
+    type value;                     \
+    bool has_value;                 \
+} type##_optional_t;
+
+/**
+ * @brief variable size array
+ */
+#define mcp_generic_vector(type) \
+typedef struct type##_vector_t { \
+    type* data;                  \
+    size_t size;                 \
+} type##_vector_t;
+
+/**
+ * @brief string type
+ */
+typedef char* string_t;
+
 mcp_generic_vector(char)
 mcp_generic_vector(int32_t)
 mcp_generic_optional(string_t)

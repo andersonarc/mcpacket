@@ -7,14 +7,14 @@
  * @date 2020-12-14
  */
       /* includes */
-#include "mcp/codec.h" /* this */
-#include <string.h> /* string operations */ 
-#include <malloc.h> /* memory allocation */ 
+#include "mcp/codec.h"     /* this */
 #include "csafe/assertd.h" /* debug assertions */
+#include <stdlib.h>        /* memory allocation */ 
+#include <string.h>        /* string operations */ 
 
       /* functions */
 /**
- * @brief minecraft uuid
+ * minecraft uuid
  */
 void mcp_encode_type_UUID(mcp_type_UUID* this, mcp_buffer_t* dest) {
   mcp_encode_be64(&this->msb, dest);
@@ -26,7 +26,7 @@ void mcp_decode_type_UUID(mcp_type_UUID* this, mcp_buffer_t* src) {
 }
 
 /**
- * @brief minecraft position
+ * minecraft position
  */
 void mcp_encode_type_Position(mcp_type_Position* this, mcp_buffer_t* dest) {
   uint64_t tmp = (
@@ -48,7 +48,7 @@ void mcp_decode_type_Position(mcp_type_Position* this, mcp_buffer_t* src) {
 }
 
 /**
- * @brief minecraft container slot
+ * minecraft container slot
  */
 void mcp_encode_type_Slot(mcp_type_Slot* this, mcp_buffer_t* dest) {
   mcp_encode_byte(&this->present, dest);
@@ -78,7 +78,7 @@ void mcp_decode_type_Slot(mcp_type_Slot* this, mcp_buffer_t* src) {
 }
 
 /**
- * @brief minecraft particle
+ * minecraft particle
  */
 void mcp_encode_type_Particle(mcp_type_Particle* this, mcp_buffer_t* dest) {
   switch(this->type) {
@@ -121,7 +121,7 @@ void mcp_decode_type_Particle(mcp_type_Particle* this, mcp_type_ParticleType p_t
 }
 
 /**
- * @brief minecraft item smelting
+ * minecraft item smelting
  */
 void mcp_encode_type_Smelting(mcp_type_Smelting* this, mcp_buffer_t* dest) {
   mcp_encode_string(&this->group, dest);
@@ -133,7 +133,7 @@ void mcp_encode_type_Smelting(mcp_type_Smelting* this, mcp_buffer_t* dest) {
   mcp_encode_bef32(&this->experience, dest);
   mcp_encode_varint(this->cook_time, dest);
 }
-MALLOC void mcp_decode_type_Smelting(mcp_type_Smelting* this, mcp_buffer_t* src) {
+void mcp_decode_type_Smelting(mcp_type_Smelting* this, mcp_buffer_t* src) {
   mcp_decode_string(&this->group, src);
   this->ingredient.size = mcp_decode_varint(src);
   this->ingredient.data = malloc(this->ingredient.size * sizeof(mcp_type_Slot));
@@ -146,7 +146,7 @@ MALLOC void mcp_decode_type_Smelting(mcp_type_Smelting* this, mcp_buffer_t* src)
 }
 
 /**
- * @brief minecraft tag
+ * minecraft tag
  */
 void mcp_encode_type_Tag(mcp_type_Tag* this, mcp_buffer_t* dest) {
   mcp_encode_string(&this->tag_name, dest);
@@ -155,9 +155,7 @@ void mcp_encode_type_Tag(mcp_type_Tag* this, mcp_buffer_t* dest) {
     mcp_encode_varint(this->entries.data[i], dest);
   }
 }
-MALLOC void mcp_decode_type_Tag(mcp_type_Tag* this, mcp_buffer_t* src) { 
-  //todo deal with memory leaks (in handlers? generate code for each packet to dealloc?)
-//todo FREE function for each MALLOC function
+void mcp_decode_type_Tag(mcp_type_Tag* this, mcp_buffer_t* src) { 
   mcp_decode_string(&this->tag_name, src);
   this->entries.size = mcp_decode_varint(src);
   this->entries.data = malloc(this->entries.size * sizeof(int32_t));
@@ -167,7 +165,9 @@ MALLOC void mcp_decode_type_Tag(mcp_type_Tag* this, mcp_buffer_t* src) {
 }
 
 /**
- * @brief minecraft entity equipment
+ * minecraft entity equipment
+ * 
+ * @todo decoder stub
  */
 void mcp_encode_type_EntityEquipment(mcp_type_EntityEquipment* this, mcp_buffer_t* dest) {
   for (size_t i = 0; i < (this->equipments.size - 1); i++) {
@@ -178,210 +178,45 @@ void mcp_encode_type_EntityEquipment(mcp_type_EntityEquipment* this, mcp_buffer_
   mcp_encode_byte((uint8_t*) &this->equipments.data[this->equipments.size - 1].slot, dest);
   mcp_encode_type_Slot(&this->equipments.data[this->equipments.size - 1].item, dest);
 }
-void mcp_decode_type_EntityEquipment(mcp_type_EntityEquipment* this, mcp_buffer_t* src) {
-  //todo VLA
-  this->equipments.size = 0;
-  this->equipments.data = NULL;
-  /*this->equipments.size = 0;
-  uint8_t slot;
-  do {
-    slot = dec_byte(src);
-    this->equipments.emplace_back();
-    this->equipments.back().slot = slot & 0x7F;
-    this->equipments.back().item.decode(src);
-  } while(slot & 0x80);*/
-}
+void mcp_decode_type_EntityEquipment(mcp_type_EntityEquipment* this, mcp_buffer_t* src) { }
 
 /**
- * @brief minecraft entity metadata
+ * minecraft entity metadata
+ * 
+ * @todo stub
  */
-void mcp_encode_type_EntityMetadata(mcp_type_EntityMetadata* this, mcp_buffer_t* dest) {
-  //todo nbt
-
-  /*for(auto &el : data) {
-    enc_byte(dest, el.index);
-    enc_varint(dest, el.type);
-    switch(el.type) {
-      case METATAG_BYTE:
-      case METATAG_BOOLEAN:
-        enc_byte(dest, (int8_t) el.value);
-        break;
-      case METATAG_VARINT:
-      case METATAG_DIRECTION:
-      case METATAG_BLOCKID:
-      case METATAG_POSE:
-        enc_varint(dest, (int32_t) el.value);
-        break;
-      case METATAG_FLOAT:
-        enc_bef32(dest, (float) el.value);
-        break;
-      case METATAG_STRING:
-      case METATAG_CHAT:
-        enc_string(dest, (const char*) el.value);
-        break;
-      case METATAG_OPTCHAT: {
-        auto str = (const char*) el.value;
-        enc_byte(dest, str.has_value());
-        if(str.has_value())
-          enc_string(dest, str.value());
-      }
-        break;
-      case METATAG_SLOT:
-        (mc_slot) el.value.encode(dest);
-        break;
-      case METATAG_ROTATION:
-        for(auto& el : (std::array<float, 3>) el.value)
-          enc_bef32(dest, el);
-      case METATAG_POSITION:
-        enc_position(dest, (mc_position) el.value);
-        break;
-      case METATAG_OPTPOSITION: {
-        auto pos = (mc_position) el.value;
-        enc_byte(dest, pos.has_value());
-        if(pos.has_value())
-          enc_position(dest, pos.value());
-      }
-        break;
-      case METATAG_OPTUUID: {
-        auto uuid = (mc_uuid) el.value;
-        enc_byte(dest, uuid.has_value());
-        if(uuid.has_value())
-          enc_uuid(dest, uuid.value());
-      }
-        break;
-      case METATAG_NBT:
-        (nbt::TagCompound) el.value.encode_full(dest);
-        break;
-      case METATAG_PARTICLE:
-        enc_varint(dest, (MCParticle) el.value.type);
-        (MCParticle) el.value.encode(dest);
-        break;
-      case METATAG_VILLAGERDATA:
-        for(auto& el : (std::array<int32_t, 3>) el.value)
-          enc_varint(dest, el);
-        break;
-      case METATAG_OPTVARINT: {
-        auto varint = (int32_t) el.value;
-        enc_byte(dest, varint.has_value());
-        if(varint.has_value())
-          enc_varint(dest, varint.value());
-      }
-        break;
-    }
-  }
-  enc_byte(dest, 0xFF);*/
-}
-void mcp_decode_type_EntityMetadata(mcp_type_EntityMetadata* this, mcp_buffer_t* src) {
-  this->data = NULL;
-  /*data.clear();
-  uint8_t index = dec_byte(src);
-  while(index != 0xFF) {
-    auto& tag = data.emplace_back();
-    tag.index = index;
-    tag.type = dec_varint(src);
-    switch(tag.type) {
-      case METATAG_BYTE:
-      case METATAG_BOOLEAN:
-        tag.value = dec_byte(src);
-        break;
-      case METATAG_VARINT:
-      case METATAG_DIRECTION:
-      case METATAG_BLOCKID:
-      case METATAG_POSE:
-        // Not sure why this is considered ambiguous, maybe conflict with int8?
-        tag.value.emplace<int32_t>(dec_varint(src));
-        break;
-      case METATAG_FLOAT:
-        tag.value = dec_bef32(src);
-        break;
-      case METATAG_STRING:
-      case METATAG_CHAT:
-        tag.value = dec_string(src);
-        break;
-      case METATAG_OPTCHAT: {
-        auto& str = tag.value.emplace<const char*>();
-        if(dec_byte(src))
-          str = dec_string(src);
-      }
-        break;
-      case METATAG_SLOT: {
-        auto& slot = tag.value.emplace<mc_slot>();
-        slot.decode(src);
-      }
-        break;
-      case METATAG_ROTATION: {
-        auto& rot = tag.value.emplace<std::array<float, 3>>();
-        for(auto &el : rot)
-          el = dec_bef32(src);
-      }
-        break;
-      case METATAG_POSITION:
-        tag.value = dec_position(src);
-        break;
-      case METATAG_OPTPOSITION: {
-        auto& pos = tag.value.emplace<mc_position>();
-        if(dec_byte(src))
-          pos = dec_position(src);
-      }
-        break;
-      case METATAG_OPTUUID: {
-        auto& uuid = tag.value.emplace<mc_uuid>();
-        if(dec_byte(src))
-          uuid = dec_uuid(src);
-      }
-        break;
-      case METATAG_NBT: {
-        auto& nbt_tag = tag.value.emplace<nbt::TagCompound>();
-        nbt_tag.decode_full(src);
-      }
-        break;
-      case METATAG_PARTICLE: {
-        auto& particle = tag.value.emplace<MCParticle>();
-        particle.decode(src, (particle_type) dec_varint(src));
-      }
-        break;
-      case METATAG_VILLAGERDATA: {
-        auto& data = tag.value.emplace<std::array<int32_t, 3>>();
-        for(auto &el : data)
-          el = dec_varint(src);
-      }
-        break;
-      case METATAG_OPTVARINT: {
-        auto& varint = tag.value.emplace<int32_t>();
-        if(dec_byte(src))
-          varint = dec_varint(src);
-      }
-        break;
-    }
-    index = dec_byte(src);
-  }*/
-}
+void mcp_encode_type_EntityMetadata(mcp_type_EntityMetadata* this, mcp_buffer_t* dest) { }
+void mcp_decode_type_EntityMetadata(mcp_type_EntityMetadata* this, mcp_buffer_t* src) { }
 
 /**
- * @brief string
+ * string
+ * 
+ * @warning strings are encoded length-prefixed and without null terminator, 
+ *            but decoder returns regular null-terminated string
  */
 void mcp_encode_string(char** this, mcp_buffer_t* dest) {
   size_t length = strlen(*this);
   mcp_encode_varint(length, dest);
-  mcp_buffer_write(dest, *this, length);
+  memcpy(mcp_buffer_current(dest), *this, length);
+  mcp_buffer_increment(dest, length);
 }
-MALLOC void mcp_decode_string(char** this, mcp_buffer_t* src) {
+void mcp_decode_string(char** this, mcp_buffer_t* src) {
   size_t length = mcp_decode_varint(src);
-  char* string = malloc(length + 1);
-  mcp_buffer_read(src, string, length);
-  string[length] = 0;
-  *this = string;
+  *this = malloc(length + 1);
+  *this[length] = 0;
+  memcpy(*this, mcp_buffer_current(src), length);
+  mcp_buffer_increment(src, length);
 }
 
 /**
- * @brief variable sized number
+ * variable sized number
  */
 void mcp_encode_varint(uint64_t src, mcp_buffer_t* dest) {
   for(; src >= 0x80; src >>= 7) {
-    mcp_buffer_current(dest) = (char) 0x80 | (src & 0x7F);
+    *mcp_buffer_current(dest) = (char) 0x80 | (src & 0x7F);
     mcp_buffer_increment(dest, 1);
   }
-  mcp_buffer_current(dest) = (char) src & 0x7F;
+  *mcp_buffer_current(dest) = (char) src & 0x7F;
   mcp_buffer_increment(dest, 1);
 }
 uint64_t mcp_decode_varint(mcp_buffer_t* src) {
@@ -389,7 +224,7 @@ uint64_t mcp_decode_varint(mcp_buffer_t* src) {
   char j;
   uint64_t dest = 0;
   do {
-    j = mcp_buffer_current(src);
+    j = *mcp_buffer_current(src);
     mcp_buffer_increment(src, 1);
     dest |= ((j & 0b01111111) << i);
     i += 7;
@@ -398,23 +233,23 @@ uint64_t mcp_decode_varint(mcp_buffer_t* src) {
 }
 
 /**
- * @brief variable sized number (from stream)
+ * variable sized number (from stream)
  */
 void mcp_encode_stream_varint(uint64_t src, mcp_stream_t dest) {
   uint64_t tmp;
   for(; src >= 0x80; src >>= 7) {
     tmp = 0x80 | (src & 0x7F);
-    mcp_stream_write(dest, (char*) &tmp, SINGLE_BYTE);
+    mcp_stream_write(dest, (char*) &tmp, 1);
   }
   tmp = src & 0x7F;
-  mcp_stream_write(dest, (char*) &tmp, SINGLE_BYTE);
+  mcp_stream_write(dest, (char*) &tmp, 1);
 }
 uint64_t mcp_decode_stream_varint(mcp_stream_t src) {
   int i = 0;
   char j;
   uint64_t dest = 0;
   do {
-    mcp_stream_read(src, &j, SINGLE_BYTE);
+    mcp_stream_read(src, &j, 1);
     dest |= ((j & 0b01111111) << i);
     i += 7;
   } while (j & 0b10000000);
@@ -422,7 +257,7 @@ uint64_t mcp_decode_stream_varint(mcp_stream_t src) {
 }
 
 /**
- * @brief nbt stub
+ * nbt stub
  */
 void mcp_encode_type_NbtTagCompound(mcp_type_NbtTagCompound* this, mcp_buffer_t* dest) { }
 void mcp_decode_type_NbtTagCompound(mcp_type_NbtTagCompound* this, mcp_buffer_t* src) { }

@@ -9,6 +9,7 @@
 #include "mcp/connection.h" /* this */
 #include "mcp/handler.h"    /* packet handlers */
 #include "mcp/codec.h"      /* encoders */
+#include "csafe/logf.h"     /* formatted logging */
 #include <stdlib.h>         /* realloc */
 
     /* functions */
@@ -26,7 +27,7 @@ void mcp_receive(mcp_context_t* context) {
             mcp_buffer_allocate(&context->buffer, compressed_size);
             mcp_buffer_init(&context->buffer);
         } else {
-            char* compressed = malloc(sizeof(char) * compressed_size);
+            char* compressed = malloc(compressed_size);
             mcp_stream_read(context->buffer.stream, compressed, compressed_size);
             mcp_buffer_allocate(&context->buffer, uncompressed_size);
             uncompress((Bytef*) context->buffer.data, (uLongf*) &uncompressed_size, (Bytef*) compressed, (uLong) compressed_size);
@@ -36,7 +37,13 @@ void mcp_receive(mcp_context_t* context) {
         mcp_buffer_allocate(&context->buffer, length);
         mcp_buffer_init(&context->buffer);
     }
-    mcp_handler_t* handler = mcp_handler_get(context->state, context->source, mcp_decode_varint(&context->buffer));
+    #ifdef NDEBUG
+        mcp_handler_t* handler = mcp_handler_get(context->state, context->source, mcp_decode_varint(&context->buffer));
+    #else
+        mcp_packet_id_t id = mcp_decode_varint(&context->buffer);
+        logd_f("mcp_receive", "packet %u::%s with length %zu", id, mcp_protocol_cstrings[context->state][context->source][id], length);
+        mcp_handler_t* handler = mcp_handler_get(context->state, context->source, id);
+    #endif /* NDEBUG */
     handler(context);
     mcp_buffer_free(&context->buffer);
 }
@@ -50,7 +57,7 @@ void mcp_send(mcp_context_t* context) {
     if (context->compression_threshold > 0) {
         if (context->buffer.size > context->compression_threshold) {
             size_t compressed_size = compressBound(context->buffer.size);
-            char* compressed = malloc(sizeof(char*) * compressed_size);
+            char* compressed = malloc(compressed_size);
             compress((Bytef*) compressed, (uLongf*) &compressed_size, (Bytef*) context->buffer.data, (uLong) context->buffer.size);
             mcp_encode_stream_varint(compressed_size + mcp_length_varlong(context->buffer.size), context->buffer.stream);
             mcp_encode_stream_varint(context->buffer.size, context->buffer.stream);

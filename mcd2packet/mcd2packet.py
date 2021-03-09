@@ -30,8 +30,7 @@ type_pre_definitions = dict(
 type_definitions = type_pre_definitions.copy()
 length_functions = dict()
 packet_length_variable = "_this_packet_length"
-packet_id_variable = "_this_mcpacket_id"
-packet_tmp_variable = "_this_tmp_byte"
+packet_tmp_variable = "_this_tmp_variable"
 
 
 def mc_data_name(typename):
@@ -45,6 +44,27 @@ def remove_prefix(string):
     if string.startswith("mcp_"):
         return string[4:]
     return string
+
+def varnum_length(varnum):
+    if(varnum < (1 << 7)):
+        return 1
+    if(varnum < (1 << 14)):
+        return 2
+    if(varnum < (1 << 21)):
+        return 3
+    if(varnum < (1 << 28)):
+        return 4
+    if(varnum < (1 << 35)):
+        return 5
+    if(varnum < (1 << 42)):
+        return 6
+    if(varnum < (1 << 49)):
+        return 7
+    if(varnum < (1 << 56)):
+        return 8
+    if(varnum < (1 << 63)):
+        return 9
+    return 10
 
 
 # MCD/Protodef has two elements of note, "fields" and "types"
@@ -108,14 +128,20 @@ class generic_type:
     def get_type(self):
         return self.typename
 
+    def free(self):
+        return ()
+
     def parameter(self):
         return f"{self.typename} {self.name}"
 
     def declaration(self):
         return f"{self.typename} {self.name};",
 
-    def initialization(self, val):
-        return f"{self.typename} {self.name} = {val};",
+    def initialization(self, value):
+        return f"{self.typename} {self.name} = {value};",
+
+    def constructor(self):
+        return f"this->{self.name} = {self.name};",
 
     def encoder(self):
         return f"mcp_encode_{self.postfix}(&{self.name}, dest);",
@@ -174,6 +200,9 @@ class void_type(numeric_type):
     typename = "void"
 
     def parameter(self):
+        return f"/* '{self.name}' is a void type */"
+
+    def constructor(self):
         return f"/* '{self.name}' is a void type */"
 
     def length(self, variable):
@@ -326,6 +355,9 @@ class mc_string(simple_type):
     
     def length(self, variable):
         return f"{variable} += mcp_length_string({self.name});",
+    
+    def free(self):
+        return f"mcp_free_{self.postfix}(&{self.name});",
 
 
 @mc_data_name("buffer")
@@ -338,11 +370,11 @@ class mc_buffer(simple_type):
         self.count = mcd_type_map[type_data["countType"]]
 
     def length(self, variable):
-        return [
+        return (
             *self.count(f'{self.name}.size', self).length(variable),
             f"{variable} += sizeof(*{self.name}.data) * {self.name}.size;"
-        ]
-
+        )
+    
     def encoder(self):
         return (
             *self.count(f'{self.name}.size', self).encoder(),
@@ -352,7 +384,7 @@ class mc_buffer(simple_type):
     def decoder(self):
         return (
             *self.count(f'{self.name}.size', self).decoder(),
-            f"mcp_decode_buffer(&{self.name}, {self.name}.size, src);",
+            f"mcp_decode_buffer(&{self.name}, src);",
         )
 
 
@@ -365,12 +397,12 @@ class mc_rest_buffer(simple_type):
         return f"{variable} += (sizeof(*{self.name}.data) * {self.name}.size);",
 
     def encoder(self):
-        return f"mcp_buffer_write(dest, {self.name}.data, {self.name}.size);",
+        return f"mcp_encode_buffer(&{self.name}, dest);",
 
     def decoder(self):
         return (
             f"{self.name}.size = src->size - src->index;",
-            f"mcp_buffer_read(src, {self.name}.data, {self.name}.size);",
+            f"mcp_decode_buffer(&{self.name}, src);",
         )
 
 
@@ -398,7 +430,7 @@ class mc_optional_nbt(simple_type):
     def encoder(self):
         return (
             f"if ({self.name}.has_value) {{",
-            f"{indent}mcp_encode_type_NbtTagCompound(&{self.name}.value, dest);", #todo length
+            f"{indent}mcp_encode_type_NbtTagCompound(&{self.name}.value, dest);",
             f"}} else {{",
             f"{indent}{packet_tmp_variable} = MCP_NBT_TAG_END;",
             f"{indent}mcp_encode_byte(&{packet_tmp_variable}, dest);",
@@ -424,6 +456,9 @@ class mc_slot(simple_type):
 class mc_smelting(simple_type):
     typename = "mcp_type_Smelting"
     postfix = "type_Smelting"
+
+    def free(self):
+        return f"mcp_free_{self.postfix}(&{self.name});",
 
 
 @mc_data_name("entityMetadata")
@@ -457,6 +492,7 @@ class mc_particle(simple_type):
 class vector_type(simple_type):
     element = ""
     element_postfix = ""
+    should_free_element = False
     count = mc_varint
     
     def __init__(self, name, parent, type_data, use_compare=False):
@@ -468,18 +504,32 @@ class vector_type(simple_type):
             p = p.parent
 
     def length(self, variable):
-        return [
+        return (
             *self.count(f"{self.name}.size", self).length(variable),
             f"{variable} += sizeof(*{self.name}.data) * {self.name}.size;"
-        ]
+        )
 
     def encoder(self):
         iterator = f"i{self.depth}"
         return (
             *self.count(f"{self.name}.size", self).encoder(),
-            f"for (int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
+            f"for (unsigned int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
             f"{indent}mcp_encode_{self.element_postfix}(&{self.name}.data[{iterator}], dest);",
             "}",
+        )
+
+    def free(self):
+        element_free_code = ()
+        if self.should_free_element:
+            iterator = f"i{self.depth}"
+            element_free_code = (
+                f"for (unsigned int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
+                f"{indent}mcp_free_{self.element_postfix}(&{self.name}.data[{iterator}]);",
+                "}"
+            )
+        return (
+            *element_free_code,
+            f"free({self.name}.data);",
         )
 
     def decoder(self):
@@ -487,7 +537,7 @@ class vector_type(simple_type):
         return (
             *self.count(f"{self.name}.size", self).decoder(),
             f"{self.name}.data = malloc({self.name}.size * sizeof({self.element}));",
-            f"for (int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
+            f"for (unsigned int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
             f"{indent}mcp_decode_{self.element_postfix}(&{self.name}.data[{iterator}], src);",
             "}"
         )
@@ -497,6 +547,7 @@ class vector_type(simple_type):
 class mc_ingredient(vector_type):
     element = "mcp_type_Slot"
     element_postfix = "type_Slot"
+    should_free_element = False
     typename = "mcp_type_Slot_vector_t"
 
 
@@ -504,6 +555,7 @@ class mc_ingredient(vector_type):
 class mc_tags(vector_type):
     element = "mcp_type_Tag"
     element_postfix = "type_Tag"
+    should_free_element = True
     typename = "mcp_type_Tag_vector_t"
 
 
@@ -537,12 +589,25 @@ class mc_option(simple_type):
 
     def length(self, variable):
         self.field.temp_name(f"{self.name}.value")
-        result = [
+        result = (
             f"{variable} += sizeof({self.name}.has_value);", 
             *self.field.length(variable)
-        ]
+        )
         self.field.reset_name()
         return result
+
+    def free(self):
+        self.field.temp_name(f"{self.name}.value")
+        element_free_code = self.field.free()
+        self.field.reset_name()
+        if len(element_free_code) == 0:
+            return ()
+        else:
+            return (
+                f"if ({self.name}.has_value) {{",
+                *(indent + line for line in element_free_code),
+                "}"
+            )
 
     def encoder(self):
         self.field.temp_name(f"{self.name}.value")
@@ -576,6 +641,12 @@ class complex_type(generic_type):
         ret = []
         for field in self.fields:
             ret.extend(field.length(variable))
+        return ret
+
+    def free(self):
+        ret = []
+        for field in self.fields:
+            ret.extend(field.free())
         return ret
 
     def get_hash(self):
@@ -630,7 +701,7 @@ class complex_type(generic_type):
         return code
 
     def typedef(self):
-        return [ 
+        return [
             f"typedef struct {self.name} {{",
             *(indent + l for f in self.fields for l in f.declaration()),
             f"}} {self.name};"
@@ -778,7 +849,7 @@ class mc_switch(simple_type):
 
     def parameter(self):
         if self.null_switch:
-            return []
+            return ()
         parameters = ""
         for field in self.fields:
             parameter = field.parameter()
@@ -788,10 +859,15 @@ class mc_switch(simple_type):
             return parameters
         return parameters[:-2]
 
+    def constructor(self):
+        if self.null_switch:
+            return ()
+        return (l for f in self.fields for l in f.constructor())
+
     def declaration(self):
         if self.null_switch:
-            return []
-        return [l for f in self.fields for l in f.declaration()]
+            return ()
+        return (l for f in self.fields for l in f.declaration())
 
     def length(self, variable):
         comp = self.get_compare()
@@ -802,6 +878,24 @@ class mc_switch(simple_type):
         if self.is_str_switch:
             return self.str_switch(comp, 2, variable)
         return self.union_multi(comp, 2, variable)
+
+    def free(self):
+        should_free = False
+        for field in self.fields:
+            if len(field.free()) != 0:
+                should_free = True
+
+        if not should_free:
+            return ()
+
+        comp = self.get_compare()
+        if self.null_switch:
+            return "",
+        if self.is_inverse:
+            return self.inverse(comp, 3)
+        if self.is_str_switch:
+            return self.str_switch(comp, 3)
+        return self.union_multi(comp, 3)
 
     def code_fields(self, ret, fields, mode, variable=None):
         has_name = hasattr(self.parent, "name") and self.parent.name
@@ -818,6 +912,8 @@ class mc_switch(simple_type):
                 ret.extend(f"{indent}{l}" for l in field.decoder())
             elif mode == 2:
                 ret.extend(f"{indent}{l}" for l in field.length(variable))
+            elif mode == 3:
+                ret.extend(f"{indent}{l}" for l in field.free())
             if has_name:
                 field.reset_name()
         return ret
@@ -1048,13 +1144,15 @@ class mc_array(simple_type):
     def fixed(self, mode, variable=None):
         iterator = f"i{self.depth}"
         self.field.temp_name(f"{self.name}.data[{iterator}]")
-        ret = [f"for (int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{"]
+        ret = [f"for (unsigned int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{"]
         if mode == 0:
             ret.extend(indent + l for l in self.field.encoder())
         elif mode == 1:
             ret.extend(indent + l for l in self.field.decoder())
         elif mode == 2:
             ret.extend(indent + l for l in self.field.length(variable))
+        elif mode == 3:
+            ret.extend(indent + l for l in self.field.free())
         ret.append("}")
         self.field.reset_name()
         return ret
@@ -1063,12 +1161,12 @@ class mc_array(simple_type):
         iterator = f"i{self.depth}"
         self.count.name = f"{self.name}.size"
         self.field.temp_name(f"{self.name}.data[{iterator}]")
-        result = [
+        result = (
             *self.count.encoder(),
-            f"for (int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
+            f"for (unsigned int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
             *(indent + l for l in self.field.encoder()),
             "}"
-        ]
+        )
         self.field.reset_name()
         return result
 
@@ -1076,13 +1174,13 @@ class mc_array(simple_type):
         iterator = f"i{self.depth}"
         self.count.name = f"{self.name}.size"
         self.field.temp_name(f"{self.name}.data[{iterator}]")
-        result = [
+        result = (
             *self.count.decoder(),
             f"{self.name}.data = malloc({self.name}.size * sizeof({self.f_type}));",
-            f"for (int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
+            f"for (unsigned int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
             *(indent + l for l in self.field.decoder()),
             "}"
-        ]
+        )
         self.field.reset_name()
         return result
     
@@ -1090,12 +1188,12 @@ class mc_array(simple_type):
         iterator = f"i{self.depth}"
         self.count.name = f"{self.name}.size"
         self.field.temp_name(f"{self.name}.data[{iterator}]")
-        result = [
+        result = (
             *self.count.length(variable),
-            f"for (int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
+            f"for (unsigned int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
             *(indent + l for l in self.field.length(variable)),
             "}"
-        ]
+        )
         self.field.reset_name()
         return result
 
@@ -1119,37 +1217,57 @@ class mc_array(simple_type):
     def foreign_encode(self):
         iterator = f"i{self.depth}"
         self.field.temp_name(f"{self.name}.data[{iterator}]")
-        result = [
-            f"for (int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
+        result = (
+            f"for (unsigned int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
             *(indent + l for l in self.field.encoder()),
             "}"
-        ]
+        )
         self.field.reset_name()
         return result
 
     def foreign_decode(self):
         iterator = f"i{self.depth}"
         self.field.temp_name(f"{self.name}.data[{iterator}]")
-        result = [
+        result = (
             f"{self.name}.size = {self.get_foreign()};",
             f"{self.name}.data = malloc({self.name}.size * sizeof({self.f_type}));",
-            f"for (int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
+            f"for (unsigned int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
             *(indent + l for l in self.field.decoder()),
             "}"
-        ]
+        )
         self.field.reset_name()
         return result
 
     def foreign_length(self, variable):
         iterator = f"i{self.depth}"
         self.field.temp_name(f"{self.name}.data[{iterator}]")
-        result = [
-            f"for (int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
+        result = (
+            f"for (unsigned int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
             *(indent + l for l in self.field.length(variable)),
             "}"
-        ]
+        )
         self.field.reset_name()
         return result
+
+    def free(self):
+        if self.is_fixed:
+            return self.fixed(3)
+
+        iterator = f"i{self.depth}"
+
+        self.field.temp_name(f"{self.name}.data[{iterator}]")
+        field_free_code = self.field.free()
+        self.field.reset_name()
+
+        if len(field_free_code) != 0:
+            return (
+                f"for (unsigned int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
+                *(indent + l for l in field_free_code),
+                "}",
+                f"free({self.name}.data);"
+            )
+        else:
+            return f"free({self.name}.data);",
 
     def encoder(self):
         if self.is_fixed:
@@ -1193,6 +1311,38 @@ class mc_container(complex_type):
         else:
             for field in self.fields:
                 ret.extend(field.length(variable))
+        return ret
+
+    def constructor(self):
+        ret = []
+        if self.name:
+            if self.name.endswith("->"):
+                suffix = ""
+            else:
+                suffix = "."
+            for field in self.fields:
+                field.temp_name(f"{self.name}{suffix}{field.name}")
+                ret.extend(field.constructor())
+                field.reset_name()
+        else:
+            for field in self.fields:
+                ret.extend(field.constructor())
+        return ret
+
+    def free(self):
+        ret = []
+        if self.name:
+            if self.name.endswith("->"):
+                suffix = ""
+            else:
+                suffix = "."
+            for field in self.fields:
+                field.temp_name(f"{self.name}{suffix}{field.name}")
+                ret.extend(field.free())
+                field.reset_name()
+        else:
+            for field in self.fields:
+                ret.extend(field.free())
         return ret
 
     def encoder(self):
@@ -1250,11 +1400,18 @@ def get_decoder(field):
     field.reset_name()
     return string
 
+def get_free(field):
+    field.temp_name("this->" + field.name)
+    string = field.free()
+    field.reset_name()
+    return string
+
 class packet:
-    def __init__(self, state, direction, packet_id, packet_name, data):
+    def __init__(self, state, direction, packet_id, packet_id_int, packet_name, data):
         self.state = state
         self.source = "server" if direction == "toClient" else "client"
         self.packet_id = packet_id
+        self.packet_id_int = packet_id_int
         self.packet_name = packet_name
         self.data = data
         self.postfix = f"packet_{self.source}_{self.packet_name}"
@@ -1276,12 +1433,11 @@ class packet:
     def declaration(self): 
         return [
             f"typedef struct {self.class_name} {{",
-            f"{indent}mcp_packet_t mcpacket;",
             *(indent + l for f in self.fields for l in f.declaration()),
             f"}} {self.class_name};",
             f"void mcp_init_{self.postfix}({self.class_name}* this);",
+            f"void mcp_free_{self.postfix}({self.class_name}* this);",
             f"void mcp_create_{self.postfix}({self.class_name}* this{self.parameters()});",
-            f"void mcp_length_{self.postfix}({self.class_name}* this, size_t* length);",
             f"void mcp_decode_{self.postfix}({self.class_name}* this, mcp_buffer_t* src);",
             f"void mcp_encode_{self.postfix}({self.class_name}* this, mcp_buffer_t* src);", 
         ]
@@ -1297,10 +1453,23 @@ class packet:
             if packet_tmp_variable in line:
                 tmp = [f"{indent}uint8_t {packet_tmp_variable} = 0;"]
         return [
-            f"void mcp_length_{self.postfix}({self.class_name}* this, size_t* length) {{",
-            f"{indent}*length = mcp_length_varlong(this->mcpacket.id);",
+            f"static inline void mcp_length_{self.postfix}({self.class_name}* this, size_t* length) {{",
+            f"{indent}*length = {varnum_length(self.packet_id_int)};",
             *tmp,
             *lengths,
+            "}"
+        ]
+
+    def free(self):
+        fields = [*(indent + l for f in self.fields for l in get_free(f))]
+        tmp = []
+        for line in fields:
+            if packet_tmp_variable in line:
+                tmp = [f"{indent}uint8_t {packet_tmp_variable} = 0;"]
+        return [
+            f"void mcp_free_{self.postfix}({self.class_name}* this) {{",
+            *tmp,
+            *fields,
             "}"
         ]
 
@@ -1316,7 +1485,7 @@ class packet:
             *tmp,
             f"{indent}mcp_length_{self.postfix}(this, &{packet_length_variable});",
             f"{indent}mcp_buffer_allocate(dest, {packet_length_variable});",
-            f"{indent}mcp_encode_varint(this->mcpacket.id, dest);",
+            f"{indent}mcp_encode_varint({self.packet_id}, dest);",
             *fields,
             "}"
         ]
@@ -1334,21 +1503,10 @@ class packet:
             "}"
         ]
 
-    def initializer(self):
-        return [
-            f"void mcp_init_{self.postfix}({self.class_name}* this) {{",
-            f"{indent}this->mcpacket.state = MCP_STATE_{self.state.upper()};",
-            f"{indent}this->mcpacket.source = MCP_SOURCE_{self.source.upper()};",
-            f"{indent}this->mcpacket.id = {self.packet_id};",
-            f"{indent}this->mcpacket.name = \"{self.class_name}\";",
-            "}"
-        ]
-
     def constructor(self):
         return [
             f"void mcp_create_{self.postfix}({self.class_name}* this{self.parameters()}) {{",
-            f"{indent}mcp_init_{self.postfix}(this);",
-            *(f"{indent}this->{f.name} = {f.name};" for f in self.fields),
+            *(indent + l for f in self.fields for l in f.constructor()),
             "}"
         ]
 
@@ -1424,31 +1582,32 @@ def run(version):
         "#ifndef MCP_PROTOCOL_H",
         "#define MCP_PROTOCOL_H",
         "",
-        "#include <zlib.h>",
         "#include \"mcp/connection.h\"",
         "#include \"mcp/io/buffer.h\"",
         "#include \"mcp/particle.h\"",
-        "#include \"mcp/misc.h\"",
         "#include \"mcp/type.h\"",
+        "#include <zlib.h>",
         "",
         f"#define MCP_MC_VERSION \"{version.replace('_', '.')}\"",
         f"#define MCP_PROTOCOL_VERSION {mcd.version['version']}",
         "",
     ]
     header_lower = [
-        "extern const char** mcp_protocol_cstrings[MCP_STATE__MAX][MCP_SOURCE__MAX];",
+        "#ifndef NDEBUG",
+        f"{indent}extern const char** mcp_protocol_cstrings[MCP_STATE__MAX][MCP_SOURCE__MAX];",
+        f"{indent}extern const mcp_packet_id_t mcp_protocol_max_ids[MCP_STATE__MAX][MCP_SOURCE__MAX];",
+        "#endif /* NDEBUG */",
         "extern mcp_handler_t** mcp_protocol_handlers[MCP_STATE__MAX][MCP_SOURCE__MAX];",
-        "extern const int mcp_protocol_max_ids[MCP_STATE__MAX][MCP_SOURCE__MAX];",
         ""
     ]
     impl_upper = [
         *warning_impl,
         f"/* MCD version {version.replace('_', '.')} */",
-        "#include <malloc.h>",
-        "#include <string.h>",
         "#include \"mcp/protocol.h\"",
         "#include \"mcp/handler.h\"",
         "#include \"mcp/codec.h\"",
+        "#include <stdlib.h>",
+        "#include <string.h>",
         ""
     ]
     impl_lower = []
@@ -1465,6 +1624,7 @@ def run(version):
     particle_header += ["} mcp_type_ParticleType;", "#endif /* MCP_PARTICLE_H */", ""]
     packet_enum = {}
     packets = {}
+    packet_ids = {}
 
     for state in mc_states:
         packet_enum[state] = {}
@@ -1473,20 +1633,21 @@ def run(version):
             packet_enum[state][direction] = []
             packets[state][direction] = []
             packet_info_list = extract_infos_from_listing(proto[state][direction])
-            for info in packet_info_list:
+            for index, info in enumerate(packet_info_list):
                 packet_data = proto[state][direction]["types"][info[2]][1]
                 if info[1] != "LegacyServerListPing":
                     packet_id = to_enum(info[1], direction, state)
                     packet_enum[state][direction].append(packet_id)
                 else:
                     packet_id = info[0]
-                pak = packet(state, direction, packet_id, info[1], packet_data)
-                if info[1] != "LegacyServerListPing": #todo LegacyServerListPing is not supported
+                packet_ids[packet_id] = index
+                pak = packet(state, direction, packet_id, index, info[1], packet_data)
+                if info[1] != "LegacyServerListPing":
                     packets[state][direction].append(pak)
                 header_lower += pak.declaration()
                 header_lower.append("")
 
-                impl_lower += pak.initializer()
+                impl_lower += pak.free()
                 impl_lower += pak.constructor()
                 impl_lower += pak.length()
                 impl_lower += pak.decoder()
@@ -1502,18 +1663,22 @@ def run(version):
             header_upper[-1] = header_upper[-1][:-1]
             header_upper.append("};")
             header_upper.append(f"extern mcp_handler_t* mcp_{dr}_{state}_handlers[MCP_{dr.upper()}_{state.upper()}__MAX];")
-            header_upper.append(f"extern const char* mcp_{dr}_{state}_cstrings[MCP_{dr.upper()}_{state.upper()}__MAX];")
+            header_upper.append("#ifndef NDEBUG")
+            header_upper.append(f"{indent}extern const char* mcp_{dr}_{state}_cstrings[MCP_{dr.upper()}_{state.upper()}__MAX];")
+            header_upper.append("#endif /* NDEBUG */")
             header_upper.append("")
 
     for state in mc_states:
         for direction in mc_directions:
             dr = "server" if direction == "toClient" else "client"
-            impl_upper.append(f"const char* mcp_{dr}_{state}_cstrings[] = {{")
+            impl_upper.append("#ifndef NDEBUG")
+            impl_upper.append(f"{indent}const char* mcp_{dr}_{state}_cstrings[] = {{")
             for pak in packets[state][direction]:
-                impl_upper.append(f"{indent}\"{pak.class_name}\",")
+                impl_upper.append(f"{indent*2}\"{pak.class_name}\",")
             if len(packets[state][direction]) > 1:
                 impl_upper[-1] = impl_upper[-1][:-1]
-            impl_upper.extend(("};", ""))
+            impl_upper.extend((f"{indent}}};", ""))
+            impl_upper.append("#endif /* NDEBUG */")
             impl_upper.append(f"mcp_handler_t* mcp_{dr}_{state}_handlers[MCP_{dr.upper()}_{state.upper()}__MAX] = {{")
             if len(packets[state][direction]) > 1:
                 impl_upper.extend([f"{indent}&mcp_handler_Blank,"] * (len(packet_enum[state][direction]) - 1))
@@ -1521,25 +1686,27 @@ def run(version):
             impl_upper.extend(("};", ""))
 
     impl_upper += [
-        "const char** mcp_protocol_cstrings[MCP_STATE__MAX][MCP_SOURCE__MAX] = {",
-        f"{indent}{{mcp_client_handshaking_cstrings, mcp_server_handshaking_cstrings}},",
-        f"{indent}{{mcp_client_status_cstrings, mcp_server_status_cstrings}},",
-        f"{indent}{{mcp_client_login_cstrings, mcp_server_login_cstrings}},",
-        f"{indent}{{mcp_client_play_cstrings, mcp_server_play_cstrings}}",
-        "};",
+        "#ifndef NDEBUG",
+        f"{indent}const char** mcp_protocol_cstrings[MCP_STATE__MAX][MCP_SOURCE__MAX] = {{",
+        f"{indent*2}{{mcp_client_handshaking_cstrings, mcp_server_handshaking_cstrings}},",
+        f"{indent*2}{{mcp_client_status_cstrings, mcp_server_status_cstrings}},",
+        f"{indent*2}{{mcp_client_login_cstrings, mcp_server_login_cstrings}},",
+        f"{indent*2}{{mcp_client_play_cstrings, mcp_server_play_cstrings}}",
+        f"{indent}}};",
+        "",
+        f"{indent}const mcp_packet_id_t mcp_protocol_max_ids[MCP_STATE__MAX][MCP_SOURCE__MAX] = {{",
+        f"{indent*2}{{MCP_CLIENT_HANDSHAKING__MAX, MCP_SERVER_HANDSHAKING__MAX}},",
+        f"{indent*2}{{MCP_CLIENT_STATUS__MAX, MCP_SERVER_STATUS__MAX}},",
+        f"{indent*2}{{MCP_CLIENT_LOGIN__MAX, MCP_SERVER_LOGIN__MAX}},",
+        f"{indent*2}{{MCP_CLIENT_PLAY__MAX, MCP_SERVER_PLAY__MAX}}",
+        f"{indent}}};",
+        "#endif /* NDEBUG */",
         "",
         "mcp_handler_t** mcp_protocol_handlers[MCP_STATE__MAX][MCP_SOURCE__MAX] = {",
         f"{indent}{{mcp_client_handshaking_handlers, mcp_server_handshaking_handlers}},",
         f"{indent}{{mcp_client_status_handlers, mcp_server_status_handlers}},",
         f"{indent}{{mcp_client_login_handlers, mcp_server_login_handlers}},",
         f"{indent}{{mcp_client_play_handlers, mcp_server_play_handlers}}",
-        "};",
-        "",
-        "const int mcp_protocol_max_ids[MCP_STATE__MAX][MCP_SOURCE__MAX] = {",
-        f"{indent}{{MCP_CLIENT_HANDSHAKING__MAX, MCP_SERVER_HANDSHAKING__MAX}},",
-        f"{indent}{{MCP_CLIENT_STATUS__MAX, MCP_SERVER_STATUS__MAX}},",
-        f"{indent}{{MCP_CLIENT_LOGIN__MAX, MCP_SERVER_LOGIN__MAX}},",
-        f"{indent}{{MCP_CLIENT_PLAY__MAX, MCP_SERVER_PLAY__MAX}}",
         "};",
         "",
     ]

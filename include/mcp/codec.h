@@ -10,156 +10,163 @@
 #define MCP_CODEC_H
 
     /* includes */
-#include <endian.h> /* byte swap */ 
 #include "mcp/io/buffer.h" /* buffered io */
 #include "mcp/type.h"      /* type definitions */
+#include <endian.h>        /* byte swap */ 
+#include <string.h>        /* string operation */
 
     /* functions */
 /**
- * @brief minecraft uuid
+ * minecraft uuid
  */
 void mcp_encode_type_UUID(mcp_type_UUID* this, mcp_buffer_t* dest);
 void mcp_decode_type_UUID(mcp_type_UUID* this, mcp_buffer_t* src); 
 
 /**
- * @brief minecraft position
+ * minecraft position
  */
 void mcp_encode_type_Position(mcp_type_Position* this, mcp_buffer_t* dest);
 void mcp_decode_type_Position(mcp_type_Position* this, mcp_buffer_t* src);
 
 /**
- * @brief minecraft slot
+ * minecraft slot
  */
 void mcp_encode_type_Slot(mcp_type_Slot* this, mcp_buffer_t* dest);
 void mcp_decode_type_Slot(mcp_type_Slot* this, mcp_buffer_t* src);
 
 /**
- * @brief minecraft particle
+ * minecraft particle
  */
 void mcp_encode_type_Particle(mcp_type_Particle* this, mcp_buffer_t* dest);
 void mcp_decode_type_Particle(mcp_type_Particle* this, mcp_type_ParticleType p_type, mcp_buffer_t* src);
 
 /**
- * @brief minecraft smelting
+ * minecraft smelting
  */
 void mcp_encode_type_Smelting(mcp_type_Smelting* this, mcp_buffer_t* dest);
 void mcp_decode_type_Smelting(mcp_type_Smelting* this, mcp_buffer_t* src);
+static inline void mcp_free_type_Smelting(mcp_type_Smelting* this) {
+  free(this->ingredient.data);
+}
 
 /**
- * @brief minecraft tag
+ * minecraft tag
  */
 void mcp_encode_type_Tag(mcp_type_Tag* this, mcp_buffer_t* dest);
 void mcp_decode_type_Tag(mcp_type_Tag* this, mcp_buffer_t* src);
+static inline void mcp_free_type_Tag(mcp_type_Tag* this) { 
+  free(this->entries.data);
+}
 
 /**
- * @brief minecraft entity equipment
+ * minecraft entity equipment
  */
 void mcp_encode_type_EntityEquipment(mcp_type_EntityEquipment* this, mcp_buffer_t* dest);
 void mcp_decode_type_EntityEquipment(mcp_type_EntityEquipment* this, mcp_buffer_t* src);
 
 /**
- * @brief minecraft entity metadata
+ * minecraft entity metadata
  */
 void mcp_encode_type_EntityMetadata(mcp_type_EntityMetadata* this, mcp_buffer_t* dest);
 void mcp_decode_type_EntityMetadata(mcp_type_EntityMetadata* this, mcp_buffer_t* src);
 
 /**
- * @brief utility macro for creating simple encoders/decoders
+ * utility macro for creating number encoders/decoders
  */
 #define __mcp_number(type, postfix, encode_converter, decode_converter)   \
 static inline void mcp_encode_##postfix(type* this, mcp_buffer_t* dest) { \
-  mcp_buffer_current(dest) = encode_converter(*this);           \
+  *mcp_buffer_current(dest) = encode_converter(*this);                    \
   mcp_buffer_increment(dest, sizeof(type));                               \
 }                                                                         \
 static inline void mcp_decode_##postfix(type* this, mcp_buffer_t* src) {  \
-  *this = decode_converter(mcp_buffer_current(src));            \
-  mcp_buffer_increment(src, sizeof(type));                               \
+  *this = decode_converter(*mcp_buffer_current(src));                     \
+  mcp_buffer_increment(src, sizeof(type));                                \
 }   
 
 #define __mcp_number_a(type, actual, postfix, encode_converter, decode_converter) \
 static inline void mcp_encode_##postfix(type* this, mcp_buffer_t* dest) {         \
-  mcp_buffer_current(dest) = encode_converter((actual) *this);        \
+  *mcp_buffer_current(dest) = encode_converter((actual) *this);                   \
   mcp_buffer_increment(dest, sizeof(actual));                                     \
 }                                                                                 \
 static inline void mcp_decode_##postfix(type* this, mcp_buffer_t* src) {          \
-  *this = (type) decode_converter(mcp_buffer_current(src));           \
-  mcp_buffer_increment(src, sizeof(actual));                                     \
+  *this = (type) decode_converter(*mcp_buffer_current(src));                      \
+  mcp_buffer_increment(src, sizeof(actual));                                      \
 }   
-
 
 #define __mcp_dummy_converter(x) x
 
-/**
- * @brief byte
- */
 //todo push values, not pointers in encoders
+
+/**
+ * byte
+ */
 __mcp_number(uint8_t, byte, __mcp_dummy_converter, __mcp_dummy_converter)
 
 /**
- * @brief big endian uint16
+ * big endian uint16
  */
 __mcp_number(uint16_t, be16, htobe16, be16toh)
 
 /**
- * @brief little endian uint16
+ * little endian uint16
  */
 __mcp_number(uint16_t, le16, htole16, le16toh)
 
 /**
- * @brief big endian uint32
+ * big endian uint32
  */
 __mcp_number(uint32_t, be32, htobe32, be32toh)
 
 /**
- * @brief little endian uint32
+ * little endian uint32
  */
 __mcp_number(uint32_t, le32, htole32, le32toh)
 
 /**
- * @brief big endian uint64
+ * big endian uint64
  */
 __mcp_number(uint64_t, be64, htobe64, be64toh)
 
 /**
- * @brief little endian uint64
+ * little endian uint64
  */
 __mcp_number(uint64_t, le64, htole64, le64toh)
 
 /**
- * @brief big endian float32
+ * big endian float32
  */
 __mcp_number_a(float, uint32_t, bef32, htobe32, be32toh)
 
 /**
- * @brief little endian float32
+ * little endian float32
  */
 __mcp_number_a(float, uint32_t, lef32, htole32, le32toh)
 
 /**
- * @brief big endian float64
+ * big endian float64
  */
 __mcp_number_a(double, uint64_t, bef64, htobe64, be64toh)
 
 /**
- * @brief little endian float64
+ * little endian float64
  */
 __mcp_number_a(double, uint64_t, lef64, htole64, le64toh)
 
 /**
- * @brief undefine the utility macro
+ * undefine the utility macro
  */
 #undef __mcp_number
 #undef __mcp_number_a
 #undef __mcp_dummy_converter
 
 /**
- * @brief variable sized number (from stream)
+ * variable sized number (from stream)
  */
 void mcp_encode_stream_varint(uint64_t src, mcp_stream_t dest);
 uint64_t mcp_decode_stream_varint(mcp_stream_t src);
 
 /**
- * @brief calculate varnum size for fixed integer
+ * calculate varnum size for fixed integer
  */
 static inline size_t mcp_length_varint(uint32_t varint) {
   if(varint < (1 << 7))
@@ -195,38 +202,41 @@ static inline size_t mcp_length_varlong(uint64_t varlong) {
 }
 
 /**
- * @brief string
+ * string
  * 
  * @warning strings are encoded length-prefixed and without null terminator, 
  *            but decoder returns regular null-terminated string
  */
 void mcp_encode_string(char** this, mcp_buffer_t* dest);
 void mcp_decode_string(char** this, mcp_buffer_t* src);
+static inline void mcp_free_string(char** this) {
+  free(*this);
+}
 static inline size_t mcp_length_string(const char* src) {
   size_t length = strlen(src);
   return mcp_length_varlong(length) + length;
 }
 
 /**
- * @brief buffer
+ * buffer
  */
 static inline void mcp_encode_buffer(char_vector_t* this, mcp_buffer_t* dest) {
-  mcp_buffer_write(dest, this->data, this->size);
+  memcpy(mcp_buffer_current(dest), this->data, this->size);
+  mcp_buffer_increment(dest, this->size);
 }
-static inline void mcp_decode_buffer(char_vector_t* this, size_t length, mcp_buffer_t* src) {
-  this->size = length;
-  this->data = malloc(sizeof(char) * length);
-  mcp_buffer_read(src, this->data, this->size);
+static inline void mcp_decode_buffer(char_vector_t* this, mcp_buffer_t* src) {
+  this->data = mcp_buffer_current(src);
+  mcp_buffer_increment(src, this->size);
 }
 
 /**
- * @brief variable sized integer
+ * variable sized integer
  */
 void mcp_encode_varint(uint64_t this, mcp_buffer_t* dest);
 uint64_t mcp_decode_varint(mcp_buffer_t* src);
 
 /**
- * @brief nbt stub
+ * @todo nbt stub
  */
 void mcp_encode_type_NbtTagCompound(mcp_type_NbtTagCompound* this, mcp_buffer_t* dest);
 void mcp_decode_type_NbtTagCompound(mcp_type_NbtTagCompound* this, mcp_buffer_t* src);
