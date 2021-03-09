@@ -203,7 +203,7 @@ void mcp_encode_string(char** this, mcp_buffer_t* dest) {
 void mcp_decode_string(char** this, mcp_buffer_t* src) {
   size_t length = mcp_decode_varint(src);
   *this = malloc(length + 1);
-  *this[length] = 0;
+  (*this)[length] = 0;
   memcpy(*this, mcp_buffer_current(src), length);
   mcp_buffer_increment(src, length);
 }
