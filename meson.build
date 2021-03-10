@@ -22,10 +22,21 @@ protocol = custom_target('protocol',
     depends: [dependencies],
     command: [python, '@INPUT@'])
 
+# C arguments
+c_args = ['-DNDEBUG', '-Wno-switch']
+
 # get dependencies
 csafe = dependency('csafe', 
     fallback: ['csafe', 'libcsafe_dep'])
-zlib = dependency('zlib')
+
+# zlib / libdeflate workaround
+zlib = meson.get_compiler('c').find_library('deflate', required: false, has_headers: ['libdeflate.h'])
+if not zlib.found()
+    message('libdeflate not found, falling back to zlib')
+    c_args += '-DMCP_USE_ZLIB'
+    zlib = dependency('zlib')
+endif
+
 
 # prepare build files
 src = files('src/handler.c', 'src/codec.c', 'src/io/stream.c', 'src/connection.c')
@@ -35,7 +46,7 @@ include = include_directories('include')
 libmcpacket = library('mcpacket', [src, protocol],
     include_directories: include,
     dependencies: [csafe, zlib],
-    c_args: ['-Wno-switch'])
+    c_args: c_args)
 
 # create a dependency
 libmcpacket_dep = declare_dependency(

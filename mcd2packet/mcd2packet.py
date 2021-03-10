@@ -123,7 +123,7 @@ class generic_type:
         self.use_compare = use_compare
 
     def length(self, variable):
-        return f"{variable} += sizeof({self.name});",
+        return f"*{variable} += sizeof({self.name});",
 
     def get_type(self):
         return self.typename
@@ -193,6 +193,8 @@ class simple_type(generic_type):
 class numeric_type(simple_type):
     size = 0
 
+    def encoder(self):
+        return f"mcp_encode_{self.postfix}({self.name}, dest);",
 
 # These exist because MCD switches use them. I hate MCD switches
 @mc_data_name("void")
@@ -224,9 +226,6 @@ class num_u8(numeric_type):
     typename = "uint8_t"
     postfix = "byte"
 
-    def encoder(self):
-        return f"mcp_encode_{self.postfix}((uint8_t*) &{self.name}, dest);",
-
     def decoder(self):
         return f"mcp_decode_{self.postfix}((uint8_t*) &{self.name}, src);",
 
@@ -252,9 +251,6 @@ class num_u16(numeric_type):
 class num_i16(num_u16):
     typename = "int16_t"
 
-    def encoder(self):
-        return f"mcp_encode_{self.postfix}((uint16_t*) &{self.name}, dest);",
-
     def decoder(self):
         return f"mcp_decode_{self.postfix}((uint16_t*) &{self.name}, src);",
 
@@ -270,9 +266,6 @@ class num_u32(numeric_type):
 class num_i32(num_u32):
     typename = "int32_t"
 
-    def encoder(self):
-        return f"mcp_encode_{self.postfix}((uint32_t*) &{self.name}, dest);",
-
     def decoder(self):
         return f"mcp_decode_{self.postfix}((uint32_t*) &{self.name}, src);",
 
@@ -286,9 +279,6 @@ class num_u64(numeric_type):
 @mc_data_name("i64")
 class num_i64(num_u64):
     typename = "int64_t"
-
-    def encoder(self):
-        return f"mcp_encode_{self.postfix}((uint64_t*) &{self.name}, dest);",
 
     def decoder(self):
         return f"mcp_decode_{self.postfix}((uint64_t*) &{self.name}, src);",
@@ -312,6 +302,12 @@ class num_position(num_u64):
     typename = "mcp_type_Position"
     postfix = "type_Position"
 
+    def encoder(self):
+        return f"mcp_encode_{self.postfix}(&{self.name}, dest);",
+
+    def length(self, variable):
+        return f"mcp_length_type_Position(&{self.name}, {variable});",
+
 
 @mc_data_name("UUID")
 class num_uuid(numeric_type):
@@ -319,6 +315,8 @@ class num_uuid(numeric_type):
     typename = "mcp_type_UUID"
     postfix = "type_UUID"
 
+    def encoder(self):
+        return f"mcp_encode_{self.postfix}(&{self.name}, dest);",
 
 @mc_data_name("varint")
 class mc_varint(numeric_type):
@@ -329,10 +327,7 @@ class mc_varint(numeric_type):
     postfix = "varint"
     
     def length(self, variable):
-        return f"{variable} += mcp_length_varint({self.name});",
-
-    def encoder(self):
-        return f"mcp_encode_{self.postfix}({self.name}, dest);",
+        return f"*{variable} += mcp_length_varint({self.name});",
 
     def decoder(self):
         return f"{self.name} = mcp_decode_{self.postfix}(src);",
@@ -345,16 +340,19 @@ class mc_varlong(numeric_type):
     postfix = "varint"
     
     def length(self, variable):
-        return f"{variable} += mcp_length_varlong({self.name});",
+        return f"*{variable} += mcp_length_varlong({self.name});",
 
 
 @mc_data_name("string")
 class mc_string(simple_type):
     typename = "string_t"
     postfix = "string"
+
+    def encoder(self):
+        return f"mcp_encode_{self.postfix}({self.name}, dest);",
     
     def length(self, variable):
-        return f"{variable} += mcp_length_string({self.name});",
+        return f"mcp_length_string({self.name}, {variable});",
     
     def free(self):
         return f"mcp_free_{self.postfix}(&{self.name});",
@@ -372,7 +370,7 @@ class mc_buffer(simple_type):
     def length(self, variable):
         return (
             *self.count(f'{self.name}.size', self).length(variable),
-            f"{variable} += sizeof(*{self.name}.data) * {self.name}.size;"
+            f"*{variable} += sizeof(*{self.name}.data) * {self.name}.size;"
         )
     
     def encoder(self):
@@ -394,7 +392,7 @@ class mc_rest_buffer(simple_type):
     postfix = "buffer"
     
     def length(self, variable):
-        return f"{variable} += (sizeof(*{self.name}.data) * {self.name}.size);",
+        return f"*{variable} += (sizeof(*{self.name}.data) * {self.name}.size);",
 
     def encoder(self):
         return f"mcp_encode_buffer(&{self.name}, dest);",
@@ -433,7 +431,7 @@ class mc_optional_nbt(simple_type):
             f"{indent}mcp_encode_type_NbtTagCompound(&{self.name}.value, dest);",
             f"}} else {{",
             f"{indent}{packet_tmp_variable} = MCP_NBT_TAG_END;",
-            f"{indent}mcp_encode_byte(&{packet_tmp_variable}, dest);",
+            f"{indent}mcp_encode_byte({packet_tmp_variable}, dest);",
             "}"
         )
 
@@ -466,6 +464,9 @@ class mc_metadata(simple_type):
     typename = "mcp_type_EntityMetadata"
     postfix = "type_EntityMetadata"
 
+    def length(self, variable):
+        return f"mcp_length_type_EntityMetadata(&{self.name}, {variable});",
+
 
 # This is not how topBitSetTerminatedArray works, but the real solution is hard
 # and this solution is easy. As long as this type is only found in the Entity
@@ -475,6 +476,8 @@ class mc_entity_equipment(simple_type):
     typename = "mcp_type_EntityEquipment"
     postfix = "type_EntityEquipment"
 
+    def length(self, variable):
+        return f"mcp_length_type_EntityEquipment(&{self.name}, {variable});",
 
 @mc_data_name("particleData")
 class mc_particle(simple_type):
@@ -484,6 +487,9 @@ class mc_particle(simple_type):
     def __init__(self, name, parent, type_data, use_compare=False):
         super().__init__(name, parent, type_data, use_compare)
         self.id_field = type_data["compareTo"]
+
+    def length(self, variable):
+        return f"mcp_length_type_Particle(&{self.name}, {variable});",
 
     def decoder(self):
         return f"mcp_decode_{self.postfix}(&{self.name}, (mcp_type_ParticleType) this->{self.id_field}, src);",
@@ -504,16 +510,19 @@ class vector_type(simple_type):
             p = p.parent
 
     def length(self, variable):
+        iterator = f"i{self.depth}"
         return (
             *self.count(f"{self.name}.size", self).length(variable),
-            f"{variable} += sizeof(*{self.name}.data) * {self.name}.size;"
+            f"for (size_t {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
+            f"{indent}mcp_length_{self.element_postfix}(&{self.name}.data[{iterator}], {variable});",
+            "}",
         )
 
     def encoder(self):
         iterator = f"i{self.depth}"
         return (
             *self.count(f"{self.name}.size", self).encoder(),
-            f"for (unsigned int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
+            f"for (size_t {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
             f"{indent}mcp_encode_{self.element_postfix}(&{self.name}.data[{iterator}], dest);",
             "}",
         )
@@ -523,7 +532,7 @@ class vector_type(simple_type):
         if self.should_free_element:
             iterator = f"i{self.depth}"
             element_free_code = (
-                f"for (unsigned int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
+                f"for (size_t {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
                 f"{indent}mcp_free_{self.element_postfix}(&{self.name}.data[{iterator}]);",
                 "}"
             )
@@ -537,7 +546,7 @@ class vector_type(simple_type):
         return (
             *self.count(f"{self.name}.size", self).decoder(),
             f"{self.name}.data = malloc({self.name}.size * sizeof({self.element}));",
-            f"for (unsigned int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
+            f"for (size_t {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
             f"{indent}mcp_decode_{self.element_postfix}(&{self.name}.data[{iterator}], src);",
             "}"
         )
@@ -612,7 +621,7 @@ class mc_option(simple_type):
     def encoder(self):
         self.field.temp_name(f"{self.name}.value")
         result = (
-            f"mcp_encode_byte((uint8_t*) &{self.name}.has_value, dest);",
+            f"mcp_encode_byte({self.name}.has_value, dest);",
             f"if ({self.name}.has_value) {{",
             *(indent + line for line in self.field.encoder()),
             "}"
@@ -761,7 +770,7 @@ class mc_bitfield(complex_type):
         self.size = total // 8
 
     def length(self, variable):
-        return f"{variable} += sizeof({self.storage.typename});",
+        return f"*{variable} += sizeof({self.storage.typename});",
 
     def encoder(self):
         ret = [*self.storage.initialization("0")]
@@ -1144,7 +1153,7 @@ class mc_array(simple_type):
     def fixed(self, mode, variable=None):
         iterator = f"i{self.depth}"
         self.field.temp_name(f"{self.name}.data[{iterator}]")
-        ret = [f"for (unsigned int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{"]
+        ret = [f"for (size_t {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{"]
         if mode == 0:
             ret.extend(indent + l for l in self.field.encoder())
         elif mode == 1:
@@ -1163,7 +1172,7 @@ class mc_array(simple_type):
         self.field.temp_name(f"{self.name}.data[{iterator}]")
         result = (
             *self.count.encoder(),
-            f"for (unsigned int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
+            f"for (size_t {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
             *(indent + l for l in self.field.encoder()),
             "}"
         )
@@ -1177,7 +1186,7 @@ class mc_array(simple_type):
         result = (
             *self.count.decoder(),
             f"{self.name}.data = malloc({self.name}.size * sizeof({self.f_type}));",
-            f"for (unsigned int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
+            f"for (size_t {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
             *(indent + l for l in self.field.decoder()),
             "}"
         )
@@ -1190,7 +1199,7 @@ class mc_array(simple_type):
         self.field.temp_name(f"{self.name}.data[{iterator}]")
         result = (
             *self.count.length(variable),
-            f"for (unsigned int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
+            f"for (size_t {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
             *(indent + l for l in self.field.length(variable)),
             "}"
         )
@@ -1218,7 +1227,7 @@ class mc_array(simple_type):
         iterator = f"i{self.depth}"
         self.field.temp_name(f"{self.name}.data[{iterator}]")
         result = (
-            f"for (unsigned int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
+            f"for (size_t {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
             *(indent + l for l in self.field.encoder()),
             "}"
         )
@@ -1231,7 +1240,7 @@ class mc_array(simple_type):
         result = (
             f"{self.name}.size = {self.get_foreign()};",
             f"{self.name}.data = malloc({self.name}.size * sizeof({self.f_type}));",
-            f"for (unsigned int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
+            f"for (size_t {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
             *(indent + l for l in self.field.decoder()),
             "}"
         )
@@ -1242,7 +1251,7 @@ class mc_array(simple_type):
         iterator = f"i{self.depth}"
         self.field.temp_name(f"{self.name}.data[{iterator}]")
         result = (
-            f"for (unsigned int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
+            f"for (size_t {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
             *(indent + l for l in self.field.length(variable)),
             "}"
         )
@@ -1261,7 +1270,7 @@ class mc_array(simple_type):
 
         if len(field_free_code) != 0:
             return (
-                f"for (unsigned int {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
+                f"for (size_t {iterator} = 0; {iterator} < {self.name}.size; {iterator}++) {{",
                 *(indent + l for l in field_free_code),
                 "}",
                 f"free({self.name}.data);"
@@ -1445,7 +1454,7 @@ class packet:
     def length(self):
         global packet_length_variable
         previous = packet_length_variable
-        packet_length_variable = "*length"
+        packet_length_variable = "length"
         lengths = [*(indent + l for f in self.fields for l in get_length(f))]
         packet_length_variable = previous
         tmp = []
@@ -1586,7 +1595,6 @@ def run(version):
         "#include \"mcp/io/buffer.h\"",
         "#include \"mcp/particle.h\"",
         "#include \"mcp/type.h\"",
-        "#include <zlib.h>",
         "",
         f"#define MCP_MC_VERSION \"{version.replace('_', '.')}\"",
         f"#define MCP_PROTOCOL_VERSION {mcd.version['version']}",

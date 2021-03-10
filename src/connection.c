@@ -11,6 +11,11 @@
 #include "mcp/codec.h"      /* encoders */
 #include "csafe/logf.h"     /* formatted logging */
 #include <stdlib.h>         /* realloc */
+#ifdef MCP_USE_ZLIB
+    #include <zlib.h>
+#else
+    #include <libdeflate.h>
+#endif /* MCP_USE_ZLIB */
 
     /* functions */
 /**
@@ -28,9 +33,16 @@ void mcp_receive(mcp_context_t* context) {
             mcp_buffer_init(&context->buffer);
         } else {
             char* compressed = malloc(compressed_size);
+            assertd_not_null("mcp_receive", compressed);
             mcp_stream_read(context->buffer.stream, compressed, compressed_size);
             mcp_buffer_allocate(&context->buffer, uncompressed_size);
-            uncompress((Bytef*) context->buffer.data, (uLongf*) &uncompressed_size, (Bytef*) compressed, (uLong) compressed_size);
+            #ifdef MCP_USE_ZLIB
+                uncompress((Bytef*) context->buffer.data, (uLongf*) &uncompressed_size, (Bytef*) compressed, (uLong) compressed_size);
+            #else
+                struct libdeflate_decompressor* decompressor = libdeflate_alloc_decompressor();
+                libdeflate_zlib_decompress(decompressor, compressed, compressed_size, context->buffer.data, context->buffer.size, NULL);
+                libdeflate_free_decompressor(decompressor);
+            #endif /* MCP_USE_ZLIB */
             free(compressed);
         }
     } else {
@@ -56,9 +68,20 @@ void mcp_receive(mcp_context_t* context) {
 void mcp_send(mcp_context_t* context) {
     if (context->compression_threshold > 0) {
         if (context->buffer.size > context->compression_threshold) {
-            size_t compressed_size = compressBound(context->buffer.size);
+            #ifdef MCP_USE_ZLIB
+                size_t compressed_size = compressBound(context->buffer.size);
+            #else
+                struct libdeflate_compressor* compressor = libdeflate_alloc_compressor(6);
+                size_t compressed_size = libdeflate_zlib_compress_bound(compressor, context->buffer.size);
+            #endif /* MCP_USE_ZLIB */
             char* compressed = malloc(compressed_size);
-            compress((Bytef*) compressed, (uLongf*) &compressed_size, (Bytef*) context->buffer.data, (uLong) context->buffer.size);
+            assertd_not_null("mcp_receive", compressed);
+            #ifdef MCP_USE_ZLIB
+                compress((Bytef*) compressed, (uLongf*) &compressed_size, (Bytef*) context->buffer.data, (uLong) context->buffer.size);
+            #else
+                libdeflate_zlib_compress(compressor, context->buffer.data, context->buffer.size, compressed, compressed_size);
+                libdeflate_free_compressor(compressor);
+            #endif /* MCP_USE_ZLIB */
             mcp_encode_stream_varint(compressed_size + mcp_length_varlong(context->buffer.size), context->buffer.stream);
             mcp_encode_stream_varint(context->buffer.size, context->buffer.stream);
             mcp_buffer_free(&context->buffer);

@@ -17,8 +17,8 @@
  * minecraft uuid
  */
 void mcp_encode_type_UUID(mcp_type_UUID* this, mcp_buffer_t* dest) {
-  mcp_encode_be64(&this->msb, dest);
-  mcp_encode_be64(&this->lsb, dest);
+  mcp_encode_be64(this->msb, dest);
+  mcp_encode_be64(this->lsb, dest);
 }
 void mcp_decode_type_UUID(mcp_type_UUID* this, mcp_buffer_t* src) {
   mcp_decode_be64(&this->msb, src);
@@ -26,40 +26,17 @@ void mcp_decode_type_UUID(mcp_type_UUID* this, mcp_buffer_t* src) {
 }
 
 /**
- * minecraft position
- */
-void mcp_encode_type_Position(mcp_type_Position* this, mcp_buffer_t* dest) {
-  uint64_t tmp = (
-    ((uint64_t) this->x & 0x3FFFFFFUL) << 38 |
-    ((uint64_t) this->z & 0x3FFFFFFUL) << 12 |
-    ((uint64_t) this->y & 0xFFFUL)
-  );
-  mcp_encode_be64(&tmp, dest);
-}
-void mcp_decode_type_Position(mcp_type_Position* this, mcp_buffer_t* src) {
-  uint64_t tmp;
-  mcp_decode_be64(&tmp, src);
-  if((this->x = tmp >> 38) & (1UL << 25))
-    this->x -= 1UL << 26;
-  if((this->z = tmp >> 12 & 0x3FFFFFFUL) & (1UL << 25))
-    this->z -= 1UL << 26;
-  if((this->y = tmp & 0xFFFUL) & (1UL << 11))
-    this->y -= 1UL << 12;
-}
-
-/**
  * minecraft container slot
  */
 void mcp_encode_type_Slot(mcp_type_Slot* this, mcp_buffer_t* dest) {
-  mcp_encode_byte(&this->present, dest);
+  mcp_encode_byte(this->present, dest);
   if (this->present) {
     mcp_encode_varint(this->item_id, dest);
-    mcp_encode_byte((uint8_t*) &this->item_count, dest);
+    mcp_encode_byte(this->item_count, dest);
     if(this->nbt_data.has_value) {
-      mcp_encode_type_NbtTagCompound(&this->nbt_data.value, dest);
+      mcp_encode_type_NbtTagCompound(this->nbt_data.value, dest);
     } else {
-      uint8_t tag = MCP_NBT_TAG_END;
-      mcp_encode_byte(&tag, dest);
+      mcp_encode_byte(MCP_NBT_TAG_END, dest);
     }
   }
 }
@@ -76,6 +53,18 @@ void mcp_decode_type_Slot(mcp_type_Slot* this, mcp_buffer_t* src) {
     }
   }
 }
+void mcp_length_type_Slot(mcp_type_Slot* this, size_t* length) {
+  *length += sizeof(this->present);
+  if (this->present) {
+    *length += mcp_length_varint(this->item_id);
+    *length += sizeof(this->item_count);
+    if(this->nbt_data.has_value) {
+      *length += sizeof(this->nbt_data.value); /* todo nbt length */
+    } else {
+      *length += sizeof(char);
+    }
+  }
+}
 
 /**
  * minecraft particle
@@ -88,10 +77,10 @@ void mcp_encode_type_Particle(mcp_type_Particle* this, mcp_buffer_t* dest) {
       break;
 
     case PARTICLE_DUST:
-      mcp_encode_bef32(&this->red, dest);
-      mcp_encode_bef32(&this->green, dest);
-      mcp_encode_bef32(&this->blue, dest);
-      mcp_encode_bef32(&this->scale, dest);
+      mcp_encode_bef32(this->red, dest);
+      mcp_encode_bef32(this->green, dest);
+      mcp_encode_bef32(this->blue, dest);
+      mcp_encode_bef32(this->scale, dest);
       break;
 
     case PARTICLE_ITEM:
@@ -119,24 +108,44 @@ void mcp_decode_type_Particle(mcp_type_Particle* this, mcp_type_ParticleType p_t
       break;
   }
 }
+void mcp_length_type_Particle(mcp_type_Particle* this, size_t* length) {
+  switch (this->type) {
+    case PARTICLE_BLOCK:
+    case PARTICLE_FALLING_DUST:
+      *length += mcp_length_varint(this->block_state);
+      break;
+
+    case PARTICLE_DUST:
+      *length += sizeof(this->red);
+      *length += sizeof(this->green);
+      *length += sizeof(this->blue);
+      *length += sizeof(this->scale);
+      break;
+
+    case PARTICLE_ITEM:
+      mcp_length_type_Slot(&this->item, length);
+      break;
+  }
+}
 
 /**
  * minecraft item smelting
  */
 void mcp_encode_type_Smelting(mcp_type_Smelting* this, mcp_buffer_t* dest) {
-  mcp_encode_string(&this->group, dest);
+  mcp_encode_string(this->group, dest);
   mcp_encode_varint(this->ingredient.size, dest);
   for (size_t i = 0; i < this->ingredient.size; i++) {
     mcp_encode_type_Slot(&this->ingredient.data[i], dest);
   }
   mcp_encode_type_Slot(&this->result, dest);
-  mcp_encode_bef32(&this->experience, dest);
+  mcp_encode_bef32(this->experience, dest);
   mcp_encode_varint(this->cook_time, dest);
 }
 void mcp_decode_type_Smelting(mcp_type_Smelting* this, mcp_buffer_t* src) {
   mcp_decode_string(&this->group, src);
   this->ingredient.size = mcp_decode_varint(src);
   this->ingredient.data = malloc(this->ingredient.size * sizeof(mcp_type_Slot));
+  assertd_not_null("mcp_decode_type_Smelting", this->ingredient.data);
   for (size_t i = 0; i < this->ingredient.size; i++) {
     mcp_decode_type_Slot(&this->ingredient.data[i], src);
   }
@@ -144,12 +153,22 @@ void mcp_decode_type_Smelting(mcp_type_Smelting* this, mcp_buffer_t* src) {
   mcp_decode_bef32(&this->experience, src);
   this->cook_time = mcp_decode_varint(src);
 }
+void mcp_length_type_Smelting(mcp_type_Smelting* this, size_t* length) {
+  mcp_length_string(this->group, length);
+  length += mcp_length_varlong(this->ingredient.size);
+  for (size_t i = 0; i < this->ingredient.size; i++) {
+    mcp_length_type_Slot(&this->ingredient.data[i], length);
+  }
+  mcp_length_type_Slot(&this->result, length);
+  *length += sizeof(this->experience);
+  *length += mcp_length_varint(this->cook_time);
+}
 
 /**
  * minecraft tag
  */
 void mcp_encode_type_Tag(mcp_type_Tag* this, mcp_buffer_t* dest) {
-  mcp_encode_string(&this->tag_name, dest);
+  mcp_encode_string(this->tag_name, dest);
   mcp_encode_varint(this->entries.size, dest);
   for (size_t i = 0; i < this->entries.size; i++) {
     mcp_encode_varint(this->entries.data[i], dest);
@@ -159,8 +178,16 @@ void mcp_decode_type_Tag(mcp_type_Tag* this, mcp_buffer_t* src) {
   mcp_decode_string(&this->tag_name, src);
   this->entries.size = mcp_decode_varint(src);
   this->entries.data = malloc(this->entries.size * sizeof(int32_t));
+  assertd_not_null("mcp_decode_type_Smelting", this->entries.data);
   for (size_t i = 0; i < this->entries.size; i++) {
     this->entries.data[i] = mcp_decode_varint(src);
+  }
+}
+void mcp_length_type_Tag(mcp_type_Tag* this, size_t* length) {
+  mcp_length_string(this->tag_name, length);
+  *length += mcp_length_varlong(this->entries.size);
+  for (size_t i = 0; i < this->entries.size; i++) {
+    *length += mcp_length_varint(this->entries.data[i]);
   }
 }
 
@@ -171,14 +198,21 @@ void mcp_decode_type_Tag(mcp_type_Tag* this, mcp_buffer_t* src) {
  */
 void mcp_encode_type_EntityEquipment(mcp_type_EntityEquipment* this, mcp_buffer_t* dest) {
   for (size_t i = 0; i < (this->equipments.size - 1); i++) {
-    uint8_t tmp = (0x80 | this->equipments.data[i].slot);
-    mcp_encode_byte(&tmp, dest);
+    mcp_encode_byte(0x80 | this->equipments.data[i].slot, dest);
     mcp_encode_type_Slot(&this->equipments.data[i].item, dest);
   }
-  mcp_encode_byte((uint8_t*) &this->equipments.data[this->equipments.size - 1].slot, dest);
+  mcp_encode_byte(this->equipments.data[this->equipments.size - 1].slot, dest);
   mcp_encode_type_Slot(&this->equipments.data[this->equipments.size - 1].item, dest);
 }
 void mcp_decode_type_EntityEquipment(mcp_type_EntityEquipment* this, mcp_buffer_t* src) { }
+void mcp_length_type_EntityEquipment(mcp_type_EntityEquipment* this, size_t* length) {
+  for (size_t i = 0; i < (this->equipments.size - 1); i++) {
+    *length += sizeof(this->equipments.data[i].slot);
+    mcp_length_type_Slot(&this->equipments.data[i].item, length);
+  }
+  *length += sizeof(this->equipments.data[this->equipments.size - 1].slot);
+  mcp_length_type_Slot(&this->equipments.data[this->equipments.size - 1].item, length);
+}
 
 /**
  * minecraft entity metadata
@@ -187,6 +221,7 @@ void mcp_decode_type_EntityEquipment(mcp_type_EntityEquipment* this, mcp_buffer_
  */
 void mcp_encode_type_EntityMetadata(mcp_type_EntityMetadata* this, mcp_buffer_t* dest) { }
 void mcp_decode_type_EntityMetadata(mcp_type_EntityMetadata* this, mcp_buffer_t* src) { }
+void mcp_length_type_EntityMetadata(mcp_type_EntityMetadata* this, size_t* length) { }
 
 /**
  * string
@@ -194,10 +229,10 @@ void mcp_decode_type_EntityMetadata(mcp_type_EntityMetadata* this, mcp_buffer_t*
  * @warning strings are encoded length-prefixed and without null terminator, 
  *            but decoder returns regular null-terminated string
  */
-void mcp_encode_string(char** this, mcp_buffer_t* dest) {
-  size_t length = strlen(*this);
+void mcp_encode_string(char* this, mcp_buffer_t* dest) {
+  size_t length = strlen(this);
   mcp_encode_varint(length, dest);
-  memcpy(mcp_buffer_current(dest), *this, length);
+  memcpy(mcp_buffer_current(dest), this, length);
   mcp_buffer_increment(dest, length);
 }
 void mcp_decode_string(char** this, mcp_buffer_t* src) {
