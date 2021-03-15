@@ -96,8 +96,6 @@ static inline void mcp_decode_##postfix(type* this, mcp_buffer_t* src) {        
 
 #define __mcp_dummy_converter(x) x
 
-//todo push values, not pointers in encoders
-
 /**
  * byte
  */

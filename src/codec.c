@@ -71,59 +71,68 @@ void mcp_length_type_Slot(mcp_type_Slot* this, size_t* length) {
  */
 void mcp_encode_type_Particle(mcp_type_Particle* this, mcp_buffer_t* dest) {
   switch(this->type) {
-    case PARTICLE_BLOCK:
-    case PARTICLE_FALLING_DUST:
+    case MCP_DEFINED_PARTICLE_BLOCK_DUST:
+    case MCP_DEFINED_PARTICLE_FALLING_DUST:
       mcp_encode_varint(this->block_state, dest);
       break;
 
-    case PARTICLE_DUST:
+    case MCP_DEFINED_PARTICLE_DUST:
       mcp_encode_bef32(this->red, dest);
       mcp_encode_bef32(this->green, dest);
       mcp_encode_bef32(this->blue, dest);
       mcp_encode_bef32(this->scale, dest);
       break;
 
-    case PARTICLE_ITEM:
+    case MCP_DEFINED_PARTICLE_ITEM:
       mcp_encode_type_Slot(&this->item, dest);
+      break;
+
+    default:
       break;
   }
 }
 void mcp_decode_type_Particle(mcp_type_Particle* this, mcp_type_ParticleType p_type, mcp_buffer_t* src) {
   this->type = p_type;
   switch (this->type) {
-    case PARTICLE_BLOCK:
-    case PARTICLE_FALLING_DUST:
+    case MCP_DEFINED_PARTICLE_BLOCK_DUST:
+    case MCP_DEFINED_PARTICLE_FALLING_DUST:
       this->block_state = mcp_decode_varint(src);
       break;
 
-    case PARTICLE_DUST:
+    case MCP_DEFINED_PARTICLE_DUST:
       mcp_decode_be32((uint32_t*) &this->red, src);
       mcp_decode_be32((uint32_t*) &this->green, src);
       mcp_decode_be32((uint32_t*) &this->blue, src);
       mcp_decode_be32((uint32_t*) &this->scale, src);
       break;
 
-    case PARTICLE_ITEM:
+    case MCP_DEFINED_PARTICLE_ITEM:
       mcp_decode_type_Slot(&this->item, src);
+      break;
+
+    default:
       break;
   }
 }
 void mcp_length_type_Particle(mcp_type_Particle* this, size_t* length) {
   switch (this->type) {
-    case PARTICLE_BLOCK:
-    case PARTICLE_FALLING_DUST:
+    case MCP_DEFINED_PARTICLE_BLOCK_DUST:
+    case MCP_DEFINED_PARTICLE_FALLING_DUST:
       *length += mcp_length_varint(this->block_state);
       break;
 
-    case PARTICLE_DUST:
+    case MCP_DEFINED_PARTICLE_DUST:
       *length += sizeof(this->red);
       *length += sizeof(this->green);
       *length += sizeof(this->blue);
       *length += sizeof(this->scale);
       break;
 
-    case PARTICLE_ITEM:
+    case MCP_DEFINED_PARTICLE_ITEM:
       mcp_length_type_Slot(&this->item, length);
+      break;
+
+    default:
       break;
   }
 }

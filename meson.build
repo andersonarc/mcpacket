@@ -23,7 +23,7 @@ protocol = custom_target('protocol',
     command: [python, '@INPUT@'])
 
 # C arguments
-c_args = ['-DNDEBUG', '-Wno-switch']
+c_args = ['-Wno-switch']
 
 # get dependencies
 csafe = dependency('csafe', 
